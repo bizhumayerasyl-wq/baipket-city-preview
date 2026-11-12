@@ -2,204 +2,329 @@
 <html lang="kk">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Маркетолог қаласы</title>
 <style>
-  html,body{margin:0;height:100%;overflow:hidden;background:#9fd3ff;font-family:system-ui,-apple-system,sans-serif;color:#fff}
+  html,body{margin:0;height:100%;overflow:hidden;background:#8ec9f5;font-family:system-ui,-apple-system,sans-serif;color:#fff;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
   canvas{display:block;touch-action:none}
-  .box{position:fixed;background:rgba(15,20,30,.82);border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.5}
-  #hud{top:10px;left:10px}
+  .box{position:fixed;background:rgba(15,20,30,.84);border-radius:12px;padding:8px 12px;font-size:13px;line-height:1.45}
+  #hud{top:8px;left:8px;max-width:62vw}
   #hud b{color:#ffd54a}
-  #msg{top:10px;left:50%;transform:translateX(-50%);text-align:center;max-width:60vw}
-  #panel{right:10px;top:10px;width:250px;display:none}
-  #panel label{display:flex;justify-content:space-between;margin-top:8px}
-  #panel input{width:100%}
-  #stats{margin-top:10px;border-top:1px solid #555;padding-top:8px;font-size:13px}
-  #buy{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:none;
-       background:#ffd54a;color:#222;border:0;border-radius:12px;padding:14px 22px;font-size:16px;font-weight:700;cursor:pointer}
-  .good{color:#7CFC9A}.bad{color:#ff8a80}
+  #bar{height:4px;background:#333;border-radius:2px;margin:4px 0}#bar i{display:block;height:100%;background:#ffd54a;border-radius:2px}
+  #map{position:fixed;top:8px;right:8px;border-radius:10px;background:rgba(15,20,30,.84)}
+  #toast{top:128px;left:50%;transform:translateX(-50%);text-align:center;width:min(440px,88vw);box-sizing:border-box;display:none;font-size:14px;z-index:6}
+  #stick{position:fixed;left:18px;bottom:22px;width:120px;height:120px;border-radius:50%;background:rgba(255,255,255,.14);touch-action:none}
+  #knob{position:absolute;left:35px;top:35px;width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.55);pointer-events:none}
+  .btn{position:fixed;right:16px;border:0;border-radius:14px;padding:13px 16px;font-size:15px;font-weight:700;cursor:pointer;display:none;max-width:60vw}
+  #act{bottom:26px;background:#ffd54a;color:#222}
+  #car{bottom:84px;background:#4fc3f7;color:#012}
+  #open{bottom:142px;background:#fff;color:#222}
+  #panel{right:8px;bottom:8px;width:min(330px,calc(100vw - 16px));box-sizing:border-box;max-height:72vh;overflow:auto;display:none;z-index:5}
+  #tabs button{background:#333;color:#fff;border:0;border-radius:8px;padding:6px 9px;margin:0 4px 6px 0;font-size:15px}
+  #tabs button.on{background:#ffd54a;color:#222}
+  #panel label{display:flex;justify-content:space-between;margin-top:7px}
+  #panel input{width:100%;margin:2px 0}
+  #stats{margin-top:8px;border-top:1px solid #555;padding-top:6px}
+  #x{float:right;background:none;border:0;color:#fff;font-size:20px}
+  #reset{margin-top:8px;background:none;border:1px solid #777;color:#aaa;border-radius:8px;padding:4px 8px;font-size:12px}
+  .good{color:#7CFC9A}.bad{color:#ff8a80}.dim{color:#aab}
 </style>
 </head>
 <body>
 <div id="hud" class="box"></div>
-<div id="msg" class="box">WASD / бағыттауыштар немесе жерді бас — жүру.<br>Сары алаңға барып, кофейня аш.</div>
+<canvas id="map" width="104" height="104"></canvas>
+<div id="toast" class="box"></div>
+<div id="stick"><div id="knob"></div></div>
+<button id="open" class="btn">📊 Бизнестерім</button>
+<button id="car" class="btn"></button>
+<button id="act" class="btn"></button>
 <div id="panel" class="box">
-  <b>☕ Кофейня — бір күндік жоспар</b>
-  <label><span>Таргет</span><span id="vT"></span></label>
-  <input id="T" type="range" min="0" max="30000" step="1000" value="5000">
-  <label><span>SMM</span><span id="vS"></span></label>
-  <input id="S" type="range" min="0" max="30000" step="1000" value="3000">
-  <label><span>Кофе бағасы</span><span id="vP"></span></label>
-  <input id="P" type="range" min="700" max="2500" step="100" value="1200">
-  <div id="stats">Бірінші күннің нәтижесін күт…</div>
+  <button id="x">✕</button>
+  <div id="tabs"></div><div id="ctl"></div><div id="stats"></div>
+  <button id="reset">Ойынды қайта бастау</button>
 </div>
-<button id="buy">Кофейня ашу — 60 000 ₸ (E)</button>
 
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
 <script type="module">
 import * as THREE from 'three';
-
-// ---------- Экономика ----------
-const DAY = 8, SHOP_COST = 60000, RENT = 8000, COGS = 400, GOAL = 500000;
-const g = { money: 100000, day: 1, t: 0, open: false, followers: 0, rep: 0, won: false, last: null };
 const $ = id => document.getElementById(id);
 const fmt = n => Math.round(n).toLocaleString('ru-RU') + ' ₸';
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-function simulateDay() {
-  let T = +$('T').value, S = +$('S').value; const P = +$('P').value;
-  if (g.money < T + S) { T = 0; S = 0; }                  // ақша жоқ болса жарнама тоқтайды
-  const conv = Math.min(.95, Math.max(.05, 1.6 - P / 1500)); // қымбат болса аз сатып алады
-  const leadsT = 40 * Math.sqrt(T / 1000);                 // таргет: бірден, бірақ өсімі баяулайды
-  g.followers = g.followers * .97 + 6 * Math.sqrt(S / 1000); // SMM: жазылушы жиналады
-  const leadsS = g.followers * .15;
-  const organic = 8 + g.rep;
-  const paid = Math.round((leadsT + leadsS) * conv);
-  const clients = Math.min(120, paid + Math.round(organic * conv));
-  const revenue = clients * P, ads = T + S;
-  const profit = revenue - clients * COGS - RENT - ads;
-  g.money += profit;
-  g.rep = Math.min(30, g.rep + clients / 60);              // риза клиент — сарафан
-  g.last = { clients, revenue, profit, ads,
-    cac: paid ? ads / paid : 0,
-    roi: ads ? (paid * (P - COGS) - ads) / ads * 100 : 0 };
-  spawnClients(Math.min(clients, 25));
-  if (!g.won && g.money >= GOAL) { g.won = true; say('🏆 Мақсат орындалды: 500 000 ₸! Сен нағыз маркетологсың.'); }
-  else if (g.money < 0) say('⚠️ Ақша минуста. Бағаны не жарнама бюджетін өзгерт.');
+// ================= Деректер =================
+const PITCH = 24, DAY = 10, GOAL = 10000000;
+// Аудан = сегмент. m* — жарнама каналының осы аудиторияға әсері, w — төлем қабілеті
+const DIST = {
+  st: { n: 'Студенттер ауданы', mT: 1, mS: 1.4, mB: 1.2, mO: .6, w: .9, col: [0xf0a58a, 0xf3e3a2, 0xb7dbb0], h: [5, 9] },
+  re: { n: 'Тұрғын аудан', mT: 1.2, mS: .8, mB: .6, mO: 1.4, w: 1, col: [0xe8c9a0, 0xd9b99b, 0xc9d6e8], h: [4, 7] },
+  ce: { n: 'Іскер орталық', mT: 1.3, mS: 1.2, mB: 1.5, mO: 1, w: 1.2, col: [0x9fb4c9, 0xb8c4d6, 0x8aa0b8], h: [12, 26] },
+  el: { n: 'Элиталық аудан', mT: .8, mS: 1, mB: 1.4, mO: 1.2, w: 1.5, col: [0xf4efe6, 0xe6d9c3, 0xd8c2ee], h: [6, 10] } };
+const distAt = (x, z) => x < 0 ? (z < 0 ? 'st' : 'ce') : (z < 0 ? 're' : 'el');
+const DEFS = [
+  { id: 'coffee', n: 'Кофейня', e: '☕', i: -1, j: -1, cost: 80000, base: 1500, pmin: 700, pmax: 2500, ps: 100, cogs: 400, rent: 12000, cap: 150, org: 8, lead: 1, adMax: 30000, col: 0x8d5a3b },
+  { id: 'barber', n: 'Барбершоп', e: '💈', i: 1, j: -1, cost: 250000, base: 5000, pmin: 2000, pmax: 10000, ps: 500, cogs: 1500, rent: 25000, cap: 60, org: 5, lead: .5, adMax: 60000, col: 0x2f4858 },
+  { id: 'cloth', n: 'Киім дүкені', e: '👗', i: -1, j: 1, cost: 700000, base: 15000, pmin: 5000, pmax: 40000, ps: 1000, cogs: 7000, rent: 60000, cap: 80, org: 6, lead: .22, adMax: 150000, col: 0x7b3fa0 },
+  { id: 'fit', n: 'Фитнес-клуб', e: '🏋️', i: 1, j: 1, cost: 2000000, base: 25000, pmin: 10000, pmax: 60000, ps: 2500, cogs: 5000, rent: 150000, cap: 90, org: 4, lead: .15, adMax: 300000, col: 0x1f8a70 }];
+DEFS.forEach(d => { d.x = d.i * PITCH; d.z = d.j * PITCH; d.d = distAt(d.x, d.z); d.blogMin = d.adMax * .2; });
+const CH = [['T', 'Таргет'], ['S', 'SMM'], ['B', 'Блогер'], ['O', 'Баннер']];
+
+let g = { money: 150000, day: 1, t: 0, mi: 0, biz: {}, won: false };
+const owned = () => Object.keys(g.biz);
+const bizList = () => Object.values(g.biz);
+const MIS = [
+  { t: 'Сары алаңға барып, кофейня аш', r: 20000, ok: () => g.biz.coffee,
+    l: 'Мақсатты аудитория: әр ауданда басқа адамдар тұрады. Студенттерге SMM мен блогер жақсы өтеді, баннер әлсіз.' },
+  { t: 'Бір күнде 40 клиент әкел', r: 30000, ok: () => bizList().some(b => b.last && b.last.clients >= 40),
+    l: 'CAC — бір клиентті әкелу құны: жарнама шығыны ÷ жарнамадан келген клиент. Ол бір сатылымның пайдасынан аз болуы керек.' },
+  { t: 'Жарнамаға 10 000 ₸+ жұмсап, ROI 150% жаса', r: 40000, ok: () => bizList().some(b => b.last && b.last.ads >= 10000 && b.last.roi >= 150),
+    l: 'ROI — жарнамаға салған ақшаның қайтарымы. Бюджетті шексіз өсіре берсең, әр келесі теңге азырақ клиент әкеледі.' },
+  { t: 'Бір бизнесте 400 жазылушы жина', r: 50000, ok: () => bizList().some(b => b.fol >= 400),
+    l: 'SMM — ұзақ ойын. Таргет бүгін сатады, ал жазылушылар ертең тегін клиент береді (LTV өседі).' },
+  { t: 'Екінші бизнесті аш', r: 100000, ok: () => owned().length >= 2,
+    l: 'Бір аудандағы тәсіл екіншісінде жұмыс істемейді. Жаңа нарыққа кірмес бұрын каналдардың күшін қара.' },
+  { t: 'Бір бизнесте нарық үлесін 60%-ға жеткіз', r: 100000, ok: () => bizList().some(b => b.last && b.last.share >= .6),
+    l: 'Позициялау: бәсекелесті тек бағамен жеңу қымбат. Репутация өссе, қымбат бағамен де таңдайды.' },
+  { t: 'Бір күнде 300 000 ₸ таза пайда тап', r: 200000, ok: () => g.dayProfit >= 300000,
+    l: 'Юнит-экономика: (баға − өзіндік құн) × клиент − жалға алу − жарнама. Әр санды бөлек бақыла.' },
+  { t: 'Төрт бизнестің бәрін аш', r: 500000, ok: () => owned().length >= 4,
+    l: 'Портфель: бір бизнестің пайдасы екіншісінің өсуін қаржыландырады.' },
+  { t: 'Капиталды 10 000 000 ₸-ге жеткіз', r: 0, ok: () => g.money >= GOAL,
+    l: '🏆 Қала сенікі. Сен маркетингтің бүкіл тізбегін өттің: сегмент → оффер → канал → өлшеу → өсу.' }];
+
+// ================= Экономика =================
+function newBiz(d) { return { set: { T: 0, S: 0, B: 0, O: 0, P: d.base }, fol: 0, aw: 0, rep: 0, cp: d.base, cpow: 1, evT: 0, evF: 0, last: null }; }
+function simBiz(d, b) {
+  const D = DIST[d.d], s = b.set, P = s.P;
+  let { T, S, B, O } = s, ads = T + S + B + O, broke = false;
+  if (g.money < ads) { T = S = B = O = ads = 0; broke = true; }
+  const lT = 35 * Math.sqrt(T / 1000) * D.mT * d.lead;
+  b.fol = b.fol * .97 + 6 * Math.sqrt(S / 1000) * D.mS;
+  const lS = b.fol * .15 * d.lead;
+  const lB = B >= d.blogMin ? 25 * Math.sqrt(B / 1000) * D.mB * d.lead : 0;
+  b.aw = b.aw * .99 + 2 * Math.sqrt(O / 1000) * D.mO;
+  const org = d.org + b.rep + b.aw * .3;
+  const conv = clamp(1.5 - P / (d.base * D.w), .05, .95);
+  const a = (1 + b.rep / 15) * Math.pow(b.cp / P, 1.2), share = a / (a + b.cpow), k = conv * share * 1.6;
+  const paid = Math.round((lT + lS + lB) * k), clients = Math.min(d.cap, paid + Math.round(org * k));
+  const revenue = clients * P, profit = revenue - clients * d.cogs - d.rent - ads;
+  b.rep = Math.min(30, b.rep + clients / (d.cap * .6));
+  b.cpow = Math.min(1.8, b.cpow + .015);
+  if (b.evT > 0 && --b.evT === 0) { b.cp = d.base; if (b.evF) { b.cpow -= .5; b.evF = 0; } }
+  b.last = { clients, revenue, profit, ads, share, broke, full: clients >= d.cap,
+    cac: paid ? ads / paid : 0, roi: ads ? (paid * (P - d.cogs) - ads) / ads * 100 : 0 };
+  spawnClients(d, Math.min(clients, 14));
+  return profit;
 }
-
-function drawUI() {
-  $('hud').innerHTML = `Ақша: <b>${fmt(g.money)}</b><br>Күн: <b>${g.day}</b> · Мақсат: ${fmt(GOAL)}` +
-    (g.open ? `<br>Жазылушы: <b>${Math.round(g.followers)}</b>` : '');
-  $('vT').textContent = fmt($('T').value); $('vS').textContent = fmt($('S').value); $('vP').textContent = fmt($('P').value);
-  const l = g.last; if (!l) return;
-  const c = v => v >= 0 ? 'good' : 'bad';
-  $('stats').innerHTML = `<b>Кешегі күн</b><br>Клиент: ${l.clients}<br>Түсім: ${fmt(l.revenue)}<br>Жарнама: ${fmt(l.ads)}` +
-    `<br>CAC: ${l.cac ? fmt(l.cac) : '—'}<br>ROI: <span class="${c(l.roi)}">${l.ads ? Math.round(l.roi) + '%' : '—'}</span>` +
-    `<br>Пайда: <span class="${c(l.profit)}">${fmt(l.profit)}</span>`;
+function rivalEvent() {
+  const ids = owned().filter(id => !g.biz[id].evT); if (!ids.length || Math.random() > .3) return;
+  const id = ids[Math.random() * ids.length | 0], b = g.biz[id], d = DEFS.find(x => x.id === id), r = Math.random();
+  if (r < .4) { b.cp = d.base * .75; b.evT = 3; toast(`⚔️ ${d.n}: бәсекелес бағаны 25% түсірді (3 күн).<br>Бағаны қуалама — репутация мен жарнамаға сүйен.`); }
+  else if (r < .75) { b.cpow += .5; b.evF = 1; b.evT = 3; toast(`📣 ${d.n}: бәсекелес үлкен жарнама науқанын бастады (3 күн).`); }
+  else { b.rep = Math.max(0, b.rep - 4); toast(`⭐ ${d.n}: жаман пікір шықты, репутация түсті.<br>Сапа мен SMM оны қайта көтереді.`); }
 }
-const say = t => $('msg').innerHTML = t;
-['T', 'S', 'P'].forEach(i => $(i).oninput = drawUI);
+function endDay() {
+  g.day++; g.dayProfit = 0;
+  for (const d of DEFS) if (g.biz[d.id]) g.dayProfit += simBiz(d, g.biz[d.id]);
+  g.money += g.dayProfit;
+  rivalEvent(); checkMission(); renderStats(); save();
+}
+function checkMission() {
+  const m = MIS[g.mi]; if (!m || !m.ok()) return;
+  g.money += m.r; g.mi++;
+  toast(`✅ ${m.t}${m.r ? ' · +' + fmt(m.r) : ''}<br>📚 ${m.l}`, 11000);
+  if (g.mi >= MIS.length) g.won = true;
+}
+function save() { try { localStorage.setItem('mq2', JSON.stringify(g)); } catch (e) {} }
+function load() { try { const s = JSON.parse(localStorage.getItem('mq2')); if (s && s.biz) g = s; } catch (e) {} g.t = 0; }
 
-// ---------- Сахна ----------
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fd3ff);
-scene.fog = new THREE.Fog(0x9fd3ff, 60, 130);
-const cam = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, .1, 300);
+// ================= Сахна =================
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x8ec9f5); scene.fog = new THREE.Fog(0x8ec9f5, 70, 190);
+const cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, .1, 400);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true;
+const mobile = matchMedia('(pointer:coarse)').matches;
+renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2)); renderer.shadowMap.enabled = !mobile;
 document.body.prepend(renderer.domElement);
 const resize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
 addEventListener('resize', resize); resize();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x667755, 1.15));
+const sun = new THREE.DirectionalLight(0xfff2d6, 1.7); sun.position.set(60, 90, 40); sun.castShadow = true;
+Object.assign(sun.shadow.camera, { left: -110, right: 110, top: 110, bottom: -110, far: 300 }); sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x667755, 1.1));
-const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(30, 50, 20); sun.castShadow = true;
-sun.shadow.camera.left = sun.shadow.camera.bottom = -60; sun.shadow.camera.right = sun.shadow.camera.top = 60;
-sun.shadow.mapSize.set(2048, 2048); scene.add(sun);
+const mat = (c, o) => new THREE.MeshLambertMaterial({ color: c, ...o });
+const add = (geo, m, x, y, z, parent = scene) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = o.receiveShadow = true; parent.add(o); return o; };
+const plane = (s, c, y) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(s, s), mat(c)); p.rotation.x = -Math.PI / 2; p.position.y = y; p.receiveShadow = true; scene.add(p); };
+plane(200, 0x40454d, 0); plane(900, 0x7ec86a, -.05);
 
-const mat = c => new THREE.MeshLambertMaterial({ color: c });
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(110, 110), mat(0x4a4f57));   // асфальт
-ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-const grass = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat(0x7ec86a));
-grass.rotation.x = -Math.PI / 2; grass.position.y = -.05; scene.add(grass);
+// Терезесі бар қабырға текстурасы
+const wc = document.createElement('canvas'); wc.width = wc.height = 64; const wx = wc.getContext('2d');
+wx.fillStyle = '#fff'; wx.fillRect(0, 0, 64, 64); wx.fillStyle = '#3d5a80';
+for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) wx.fillRect(8 + a * 32, 10 + b * 32, 16, 16);
+const winTex = new THREE.CanvasTexture(wc); winTex.wrapS = winTex.wrapT = THREE.RepeatWrapping; winTex.colorSpace = THREE.SRGBColorSpace;
 
-// Қала: 5x5 квартал, ортасы — бос орын
-const colliders = [], COLORS = [0xe8c9a0, 0xc9d6e8, 0xf0a58a, 0xb7dbb0, 0xd8c2ee, 0xf3e3a2];
-for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
-  const x = i * 20, z = j * 20;
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(14, .2, 14), mat(0xbfc4c9));
-  pad.position.set(x, .1, z); pad.receiveShadow = true; scene.add(pad);
-  if (!i && !j) continue;
-  const h = 4 + ((i * 7 + j * 13 + 40) % 5) * 2.5;
-  const b = new THREE.Mesh(new THREE.BoxGeometry(11, h, 11), mat(COLORS[(i * 3 + j * 5 + 30) % 6]));
-  b.position.set(x, h / 2, z); b.castShadow = b.receiveShadow = true; scene.add(b);
-  colliders.push({ x, z, r: 6 });
+function label(text, bg = '#fff8e1', fg = '#3a2a10') {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const x = c.getContext('2d');
+  x.fillStyle = bg; x.beginPath(); x.roundRect(0, 0, 512, 128, 28); x.fill();
+  x.fillStyle = fg; x.font = 'bold 52px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, 256, 68, 490);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c) })); s.scale.set(11, 2.75, 1); return s;
 }
-const lot = new THREE.Mesh(new THREE.BoxGeometry(14, .3, 14), new THREE.MeshLambertMaterial({ color: 0xffd54a, emissive: 0x554400 }));
-lot.position.y = .15; scene.add(lot);
 
-function buildShop() {
-  scene.remove(lot);
-  const s = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 10), mat(0x8d5a3b)); body.position.y = 2;
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(11.5, .6, 11.5), mat(0xd9483b)); roof.position.y = 4.3;
-  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
-  const c = cv.getContext('2d'); c.fillStyle = '#fff8e1'; c.fillRect(0, 0, 512, 128);
-  c.fillStyle = '#5d3a1a'; c.font = 'bold 72px sans-serif'; c.textAlign = 'center'; c.fillText('☕ КОФЕЙНЯ', 256, 90);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cv) }));
-  sign.position.set(0, 6, 0);
-  s.add(body, roof, sign); s.traverse(o => o.castShadow = true); scene.add(s);
-  shopSign = sign; colliders.push({ x: 0, z: 0, r: 5.5 });
+const colliders = [], lots = {};
+const rnd = (i, j, n) => Math.abs((i * 73 + j * 151 + n * 31) % 97) / 97;
+for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) {
+  const x = i * PITCH, z = j * PITCH, park = !i || !j;
+  add(new THREE.BoxGeometry(16, .24, 16), mat(park ? 0x6fbf5f : 0xb9bec4), x, .12, z);
+  if (park) { for (let k = 0; k < 4; k++) { const tx = x + (rnd(i, j, k) - .5) * 11, tz = z + (rnd(j, i, k + 5) - .5) * 11;
+      add(new THREE.CylinderGeometry(.25, .3, 1.6), mat(0x7a5230), tx, .9, tz); add(new THREE.ConeGeometry(1.5, 3.4, 7), mat(0x3f9b4b), tx, 3.2, tz); } continue; }
+  if (DEFS.some(d => d.i === i && d.j === j)) continue;
+  const D = DIST[distAt(x, z)], h = D.h[0] + rnd(i, j, 1) * (D.h[1] - D.h[0]), t = winTex.clone(); t.repeat.set(3, Math.max(1, Math.round(h / 3.2)));
+  add(new THREE.BoxGeometry(13, h, 13), mat(D.col[(i + j + 9) % 3], { map: t }), x, h / 2, z);
+  colliders.push({ x, z, r: 7 });
 }
-let shopSign = null;
+function buildLot(d) {
+  const grp = new THREE.Group(); grp.position.set(d.x, 0, d.z); scene.add(grp);
+  if (g.biz[d.id]) {
+    add(new THREE.BoxGeometry(11, 4.4, 11), mat(d.col), 0, 2.2, 0, grp); add(new THREE.BoxGeometry(12.4, .6, 12.4), mat(0xffd54a), 0, 4.7, 0, grp);
+    add(new THREE.BoxGeometry(3, 2.6, .3), mat(0xcfe8ff), 0, 1.3, 5.5, grp);
+    const s = label(d.e + ' ' + d.n); s.position.y = 7.4; grp.add(s); colliders.push({ x: d.x, z: d.z, r: 6 });
+  } else {
+    add(new THREE.BoxGeometry(15, .3, 15), mat(0xffd54a, { emissive: 0x554400 }), 0, .3, 0, grp);
+    const s = label(d.e + ' ' + fmt(d.cost), '#222', '#ffd54a'); s.position.y = 4; grp.add(s);
+  }
+  if (lots[d.id]) scene.remove(lots[d.id]); lots[d.id] = grp;
+}
 
 function person(color) {
-  const p = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.45, .9, 4, 8), mat(color)); body.position.y = .95;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(.38, 12, 12), mat(0xf2c9a0)); head.position.y = 2;
-  p.add(body, head); p.traverse(o => o.castShadow = true); scene.add(p); return p;
+  const p = new THREE.Group(); add(new THREE.CapsuleGeometry(.45, .9, 4, 8), mat(color), 0, .95, 0, p);
+  add(new THREE.SphereGeometry(.38, 12, 12), mat(0xf2c9a0), 0, 2, 0, p); scene.add(p); return p;
 }
-const player = person(0x2f6fed); player.position.set(10, 0, 14);
+function makeCar(color) {
+  const c = new THREE.Group(); add(new THREE.BoxGeometry(2, .8, 4.2), mat(color), 0, .75, 0, c); add(new THREE.BoxGeometry(1.8, .7, 2.2), mat(0x22303c), 0, 1.45, -.2, c);
+  for (const sx of [-1, 1]) for (const sz of [-1.3, 1.3]) { const w = add(new THREE.CylinderGeometry(.4, .4, .3, 10), mat(0x111111), sx, .4, sz, c); w.rotation.z = Math.PI / 2; }
+  scene.add(c); return c;
+}
+const player = person(0x2f6fed); player.position.set(10, 0, 12);
+const myCar = makeCar(0xe53935); myCar.position.set(14, 0, 4);
+let ang = Math.PI, speed = 0, inCar = false;
 
-// ---------- Клиенттер ----------
-const npcs = [];
-function spawnClients(n) {
-  for (let k = 0; k < n; k++) {
-    const sx = Math.random() < .5 ? 10 : -10, sz = Math.random() < .5 ? 50 : -50;
-    const m = person(COLORS[k % 6]); m.position.set(sx + Math.random() * 2 - 1, 0, sz);
-    npcs.push({ m, wait: Math.random() * DAY * .8, path: [[sx, 0], [Math.sign(sx) * 6, 0]] });
-  }
-}
-function moveNpcs(dt) {
-  for (let i = npcs.length - 1; i >= 0; i--) {
-    const n = npcs[i]; if ((n.wait -= dt) > 0) continue;
-    const [tx, tz] = n.path[0], dx = tx - n.m.position.x, dz = tz - n.m.position.z, d = Math.hypot(dx, dz);
-    if (d < .4) { n.path.shift(); if (!n.path.length) { scene.remove(n.m); npcs.splice(i, 1); } continue; }
-    n.m.position.x += dx / d * 7 * dt; n.m.position.z += dz / d * 7 * dt; n.m.rotation.y = Math.atan2(dx, dz);
-  }
-}
+// Қаладағы көліктер
+const traffic = [];
+[-60, -36, -12, 12, 36, 60].forEach((road, n) => { for (const dir of [1, -1]) { if ((n + dir) % 3 === 0) continue;
+  traffic.push({ m: makeCar([0x1e88e5, 0xfdd835, 0x8e24aa, 0xfafafa, 0x43a047][traffic.length % 5]), ax: n % 2, road, dir, p: (n * 37 * dir) % 90 }); } });
+function moveTraffic(dt) { for (const c of traffic) { c.p += c.dir * 13 * dt; if (Math.abs(c.p) > 96) c.p = -96 * c.dir;
+  if (c.ax) { c.m.position.set(c.p, 0, c.road + c.dir * 2); c.m.rotation.y = c.dir > 0 ? Math.PI / 2 : -Math.PI / 2; }
+  else { c.m.position.set(c.road - c.dir * 2, 0, c.p); c.m.rotation.y = c.dir > 0 ? 0 : Math.PI; } } }
 
-// ---------- Басқару ----------
-const keys = {}; let target = null;
-addEventListener('keydown', e => { keys[e.code] = 1; if (e.code === 'KeyE') buy(); });
+// Клиенттер
+const npcs = [], NC = [0xe8c9a0, 0xf0a58a, 0xb7dbb0, 0xd8c2ee, 0xf3e3a2, 0x9fb4c9];
+function spawnClients(d, n) { for (let k = 0; k < n; k++) { const s = Math.random() < .5 ? 1 : -1, m = person(NC[k % 6]);
+  m.position.set(d.x + s * 12 + Math.random() * 2 - 1, 0, d.z + (Math.random() - .5) * 60);
+  npcs.push({ m, wait: Math.random() * DAY * .8, path: [[d.x + s * 12, d.z], [d.x + s * 6, d.z]] }); } }
+function moveNpcs(dt) { for (let i = npcs.length - 1; i >= 0; i--) { const n = npcs[i]; if ((n.wait -= dt) > 0) continue;
+  const [tx, tz] = n.path[0], dx = tx - n.m.position.x, dz = tz - n.m.position.z, d = Math.hypot(dx, dz);
+  if (d < .5) { n.path.shift(); if (!n.path.length) { scene.remove(n.m); npcs.splice(i, 1); } continue; }
+  n.m.position.x += dx / d * 6 * dt; n.m.position.z += dz / d * 6 * dt; n.m.rotation.y = Math.atan2(dx, dz); } }
+
+// ================= Басқару =================
+const keys = {}, joy = { x: 0, y: 0 };
+addEventListener('keydown', e => { keys[e.code] = 1; if (e.code === 'KeyE') action(); if (e.code === 'KeyF') toggleCar(); });
 addEventListener('keyup', e => keys[e.code] = 0);
-const ray = new THREE.Raycaster(), v2 = new THREE.Vector2();
-renderer.domElement.addEventListener('pointerdown', e => {
-  v2.set(e.clientX / innerWidth * 2 - 1, -e.clientY / innerHeight * 2 + 1); ray.setFromCamera(v2, cam);
-  const hit = ray.intersectObject(grass)[0]; if (hit) target = hit.point;
-});
-function movePlayer(dt) {
-  let dx = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-  let dz = (keys.KeyS || keys.ArrowDown ? 1 : 0) - (keys.KeyW || keys.ArrowUp ? 1 : 0);
-  if (dx || dz) target = null;
-  else if (target) { dx = target.x - player.position.x; dz = target.z - player.position.z; if (Math.hypot(dx, dz) < .3) { target = null; return; } }
-  const d = Math.hypot(dx, dz); if (!d) return;
-  const nx = player.position.x + dx / d * 12 * dt, nz = player.position.z + dz / d * 12 * dt;
-  const free = (x, z) => Math.abs(x) < 54 && Math.abs(z) < 54 && !colliders.some(c => Math.abs(x - c.x) < c.r && Math.abs(z - c.z) < c.r);
-  if (free(nx, player.position.z)) player.position.x = nx;
-  if (free(player.position.x, nz)) player.position.z = nz;
-  player.rotation.y = Math.atan2(dx, dz);
-}
-const nearLot = () => !g.open && Math.abs(player.position.x) < 9 && Math.abs(player.position.z) < 9;
-function buy() {
-  if (!nearLot() || g.money < SHOP_COST) return;
-  g.money -= SHOP_COST; g.open = true; buildShop();
-  player.position.set(10, 0, 8);
-  $('panel').style.display = 'block';
-  say('Кофейня ашылды! Оң жақтан бюджет пен бағаны қой.<br>Таргет бірден клиент әкеледі, SMM баяу, бірақ жиналады.');
-}
-$('buy').onclick = buy;
+const stick = $('stick'), knob = $('knob');
+function joyMove(e) { const r = stick.getBoundingClientRect(); let x = (e.clientX - r.left - 60) / 45, y = (e.clientY - r.top - 60) / 45;
+  const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } joy.x = x; joy.y = y; knob.style.transform = `translate(${x * 35}px,${y * 35}px)`; }
+stick.onpointerdown = e => { stick.setPointerCapture(e.pointerId); joyMove(e); };
+stick.onpointermove = e => { if (stick.hasPointerCapture(e.pointerId)) joyMove(e); };
+stick.onpointerup = stick.onpointercancel = () => { joy.x = joy.y = 0; knob.style.transform = ''; };
 
-// ---------- Цикл ----------
-const clock = new THREE.Clock();
+const free = (x, z) => Math.abs(x) < 94 && Math.abs(z) < 94 && !colliders.some(c => Math.abs(x - c.x) < c.r && Math.abs(z - c.z) < c.r);
+function move(dt) {
+  const fwd = clamp((keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0) - joy.y, -1, 1);
+  const turn = clamp((keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0) + joy.x, -1, 1);
+  const o = inCar ? myCar : player;
+  if (inCar) { speed += fwd * 26 * dt; speed *= 1 - 1.2 * dt; speed = clamp(speed, -10, 32); ang -= turn * 1.9 * dt * Math.sign(speed) * Math.min(1, Math.abs(speed) / 7); }
+  else { speed = fwd * (fwd < 0 ? 5 : 11); ang -= turn * 2.4 * dt; }
+  const nx = o.position.x + Math.sin(ang) * speed * dt, nz = o.position.z + Math.cos(ang) * speed * dt;
+  let hit = true; if (free(nx, o.position.z)) { o.position.x = nx; hit = false; } if (free(o.position.x, nz)) { o.position.z = nz; hit = false; }
+  if (hit && inCar) speed *= -.3;
+  o.rotation.y = ang;
+}
+function toggleCar() {
+  if (inCar) { inCar = false; speed = 0; player.visible = true; player.position.set(myCar.position.x + Math.cos(ang) * 2.5, 0, myCar.position.z - Math.sin(ang) * 2.5); }
+  else if (player.position.distanceTo(myCar.position) < 6) { inCar = true; player.visible = false; ang = myCar.rotation.y; }
+}
+const pos = () => (inCar ? myCar : player).position;
+const nearLot = () => DEFS.find(d => Math.hypot(pos().x - d.x, pos().z - d.z) < 14);
+function action() {
+  const d = nearLot(); if (!d || inCar) return;
+  if (g.biz[d.id]) return openPanel(d.id);
+  if (g.money < d.cost) return toast(`Ақша жетпейді: ${d.n} — ${fmt(d.cost)}`);
+  g.money -= d.cost; g.biz[d.id] = newBiz(d); buildLot(d); player.position.set(d.x, 0, d.z + 10);
+  const D = DIST[d.d];
+  toast(`${d.e} ${d.n} ашылды! ${D.n}: таргет ×${D.mT}, SMM ×${D.mS}, блогер ×${D.mB}, баннер ×${D.mO}.<br>Бюджет пен бағаны қой.`, 9000);
+  checkMission(); openPanel(d.id); save();
+}
+$('act').onclick = action; $('car').onclick = toggleCar;
+
+// ================= Интерфейс =================
+let cur = null, toastT = 0;
+function toast(html, ms = 6500) { const t = $('toast'); t.innerHTML = html; t.style.display = 'block'; clearTimeout(toastT); toastT = setTimeout(() => t.style.display = 'none', ms); }
+function openPanel(id) { cur = id || cur || owned()[0]; if (!cur) return; $('panel').style.display = 'block'; renderPanel(); }
+$('open').onclick = () => openPanel(); $('x').onclick = () => $('panel').style.display = 'none';
+$('reset').onclick = () => { if (confirm('Бәрін өшіріп, басынан бастайсың ба?')) { try { localStorage.removeItem('mq2'); } catch (e) {} location.reload(); } };
+function renderPanel() {
+  const d = DEFS.find(x => x.id === cur), b = g.biz[cur], D = DIST[d.d];
+  $('tabs').innerHTML = owned().map(id => `<button class="${id === cur ? 'on' : ''}" data-id="${id}">${DEFS.find(x => x.id === id).e}</button>`).join('');
+  $('tabs').querySelectorAll('button').forEach(x => x.onclick = () => { cur = x.dataset.id; renderPanel(); });
+  $('ctl').innerHTML = `<b>${d.e} ${d.n}</b> <span class="dim">· ${D.n}</span>` +
+    CH.map(([k, n]) => `<label><span>${n} <span class="dim">×${D['m' + k]}</span></span><span id="v${k}"></span></label>
+      <input type="range" data-k="${k}" min="0" max="${d.adMax}" step="${d.adMax / 30}" value="${b.set[k]}">`).join('') +
+    `<label><span>Баға</span><span id="vP"></span></label><input type="range" data-k="P" min="${d.pmin}" max="${d.pmax}" step="${d.ps}" value="${b.set.P}">` +
+    `<div class="dim">Блогер ${fmt(d.blogMin)}-ден төмен ақшаға жұмыс істемейді.</div>`;
+  const show = () => { for (const k of 'TSBOP') $('v' + k).textContent = fmt(b.set[k]); };
+  $('ctl').querySelectorAll('input').forEach(x => x.oninput = () => { b.set[x.dataset.k] = +x.value; show(); });
+  show(); renderStats();
+}
+function renderStats() {
+  if ($('panel').style.display !== 'block' || !cur) return;
+  const d = DEFS.find(x => x.id === cur), b = g.biz[cur], l = b.last, c = v => v >= 0 ? 'good' : 'bad';
+  $('stats').innerHTML = `Бәсекелес бағасы: <b>${fmt(b.cp)}</b>${b.evT ? ' ⚔️' : ''} · Репутация: ${b.rep.toFixed(1)}/30<br>Жазылушы: ${Math.round(b.fol)}` +
+    (l ? `<br><b>Кешегі күн</b>${l.broke ? ' <span class="bad">(ақша жетпей, жарнама тоқтады)</span>' : ''}<br>Клиент: ${l.clients}/${d.cap}${l.full ? ' <span class="bad">толды — бағаны көтер</span>' : ''}
+      <br>Нарық үлесі: ${Math.round(l.share * 100)}%<br>Түсім: ${fmt(l.revenue)} · Жарнама: ${fmt(l.ads)}<br>CAC: ${l.cac ? fmt(l.cac) : '—'} · ROI: <span class="${c(l.roi)}">${l.ads ? Math.round(l.roi) + '%' : '—'}</span>
+      <br>Пайда: <span class="${c(l.profit)}">${fmt(l.profit)}</span>` : '<br>Бірінші күннің нәтижесін күт…');
+}
+const mapCtx = $('map').getContext('2d');
+function drawHud() {
+  const D = DIST[distAt(pos().x, pos().z)], m = MIS[g.mi];
+  $('hud').innerHTML = `💰 <b>${fmt(g.money)}</b> · Күн ${g.day}<div id="bar"><i style="width:${g.t / DAY * 100}%"></i></div>` +
+    `📍 ${D.n} <span class="dim">Т×${D.mT} S×${D.mS} Б×${D.mB} Бн×${D.mO}</span><br>🎯 ${m ? m.t + (m.r ? ` <span class="dim">(+${fmt(m.r)})</span>` : '') : 'Барлық миссия орындалды 🏆'}`;
+  const d = nearLot(), near = d && !inCar;
+  $('act').style.display = near ? 'block' : 'none';
+  if (near) $('act').textContent = g.biz[d.id] ? `${d.e} Басқару (E)` : `${d.e} ${d.n} ашу — ${fmt(d.cost)}`;
+  const nc = inCar || player.position.distanceTo(myCar.position) < 6;
+  $('car').style.display = nc ? 'block' : 'none'; $('car').textContent = inCar ? '🚶 Түсу (F)' : '🚗 Отыру (F)';
+  $('open').style.display = owned().length && $('panel').style.display !== 'block' ? 'block' : 'none';
+  const s = 104 / 200, q = v => (v + 100) * s; mapCtx.clearRect(0, 0, 104, 104);
+  for (const d of DEFS) { mapCtx.fillStyle = g.biz[d.id] ? '#7CFC9A' : '#ffd54a'; mapCtx.fillRect(q(d.x) - 4, q(d.z) - 4, 8, 8); }
+  mapCtx.fillStyle = '#e53935'; mapCtx.fillRect(q(myCar.position.x) - 2, q(myCar.position.z) - 2, 4, 4);
+  mapCtx.fillStyle = '#fff'; mapCtx.beginPath(); mapCtx.arc(q(pos().x), q(pos().z), 3.5, 0, 7); mapCtx.fill();
+  mapCtx.strokeStyle = '#fff'; mapCtx.beginPath(); mapCtx.moveTo(q(pos().x), q(pos().z)); mapCtx.lineTo(q(pos().x) + Math.sin(ang) * 9, q(pos().z) + Math.cos(ang) * 9); mapCtx.stroke();
+}
+
+// ================= Іске қосу =================
+load(); DEFS.forEach(buildLot);
+toast(mobile ? 'Сол жақтағы джойстикпен жүр. Сары алаңға барып, бизнес аш.' : 'W/S — жүру, A/D — бұрылу, E — әрекет, F — көлік. Сары алаңға барып, бизнес аш.', 9000);
+const clock = new THREE.Clock(), look = new THREE.Vector3(); let hudT = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), .05);
-  movePlayer(dt); moveNpcs(dt);
-  if (g.open && (g.t += dt) >= DAY) { g.t = 0; g.day++; simulateDay(); }
-  $('buy').style.display = nearLot() ? 'block' : 'none';
-  cam.position.set(player.position.x, 38, player.position.z + 16); cam.lookAt(player.position.x, 0, player.position.z);
-  if (shopSign) shopSign.lookAt(cam.position);
-  drawUI(); renderer.render(scene, cam);
+  move(dt); moveNpcs(dt); moveTraffic(dt);
+  if (owned().length && (g.t += dt) >= DAY) { g.t = 0; endDay(); }
+  const p = pos(), dist = inCar ? 15 : 11, hgt = inCar ? 7.5 : 6.5;
+  cam.position.lerp(look.set(p.x - Math.sin(ang) * dist, hgt, p.z - Math.cos(ang) * dist), 1 - Math.pow(.001, dt));
+  cam.lookAt(p.x + Math.sin(ang) * 4, 2, p.z + Math.cos(ang) * 4);
+  if ((hudT -= dt) <= 0) { hudT = .2; drawHud(); }
+  renderer.render(scene, cam);
 });
-window.__game = g;
+window.__game = () => ({ g, player, action, endDay });
 </script>
 </body>
 </html>

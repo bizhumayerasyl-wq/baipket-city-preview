@@ -30,7 +30,7 @@ function showStart() {
   acts = { cont: () => begin(), new: () => { if (Gm.hasSave()) { $('start').style.display = 'none'; confirmBox('Сақталған ойын өшіп, бәрі басынан басталады. Жалғастырасың ба?', () => { Gm.reset(); begin(); }, 'Иә, басынан'); acts.no = () => { closeModal(); showStart(); }; } else { Gm.reset(); begin(); } } };
 }
 function begin() {
-  $('start').style.display = 'none'; started = true; refreshLots(); panelKind = null;
+  $('start').style.display = 'none'; started = true; paused = false; refreshLots(); panelKind = null;
   if (g().px != null) place(g().px, g().pz);
   if (!g().intro) modal(`<h2>BAIPKET CITY-ге қош келдің</h2><p>Сен — қалаға жаңа келген жас маркетологсың. Қалтаңда 50 000 ₸, атың әлі ешкімге таныс емес.</p>
     <p>Қаладағы бизнестердің әрқайсысында шешілмеген мәселе бар. Иесімен сөйлес, мәселені тап, стратегия құр да, оның бюджетімен нәтиже көрсет. Жақсы жұмыс — гонорар, тәжірибе және жаңа тапсырыс.</p>
@@ -158,7 +158,7 @@ function doDay() {
   renderPanel(); drawHud();
 }
 function showResult(r) {
-  const { c, s } = r, G = c.goal; refreshLots();
+  const { c, s } = r, G = c.goal; refreshLots(); paused = false;
   modal(`<div class="dim">${c.name} · кейс қорытындысы</div><h2>${s.ok ? 'Мақсат орындалды' : 'Мақсатқа жетпедің'} ${stars(s.stars)}</h2>
     <table><tr><td>Көрсеткіш</td><td>${num(G.from)}${G.u} → <b class="${s.p >= 1 ? 'good' : 'bad'}">${num(s.val)}${G.u}</b> (мақсат ${num(G.to)}${G.u})</td></tr>
     ${c.must ? `<tr><td>Шарт</td><td class="${s.must ? 'good' : 'bad'}">${c.must.t}: ${s.must ? 'орындалды' : 'орындалмады'}</td></tr>` : ''}
@@ -228,4 +228,4 @@ startLoop(dt => {
   frame(dt, frozen);
   if (started && (hudT -= dt) <= 0) { hudT = .2; drawHud(); }
 });
-if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin };   // тек әзірлеу кезінде
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame };   // тек әзірлеу кезінде

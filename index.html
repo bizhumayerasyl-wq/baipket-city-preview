@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BAIPKET CITY</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -30,11 +31,12 @@
   <small>Baipket Academy · Az-azdan, üzdiksiz.</small>
 </div>
 
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"./vendor/three-0.160.0.module.js"}}</script>
 <script type="module" src="js/main.js"></script>
 <script>
-  // Ойын 12 секундта іске қосылмаса (интернет не кітапхана жүктелмесе), түсінікті хабар шығады
-  setTimeout(function () { var l = document.getElementById('loading'); if (l && !window.__started) l.innerHTML = 'Ойын жүктелмеді.<br>Интернетті тексеріп, бетті жаңартып көр.'; }, 12000);
+  // Ойын 12 секундта іске қосылмаса, түсінікті хабар шығады. sw.js — оффлайн режим.
+  setTimeout(function () { var l = document.getElementById('loading'); if (l && !window.__started) l.innerHTML = 'Ойын жүктелмеді.<br>Бетті жаңартып көр.'; }, 12000);
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(function () {});
 </script>
 </body>
 </html>

@@ -8,10 +8,12 @@ export let saveError = false;
 export const hasSave = () => { try { const s = JSON.parse(localStorage.getItem(KEY)); return !!(s && s.v === 4 && s.intro); } catch (e) { return false; } };
 export function save() { try { localStorage.setItem(KEY, JSON.stringify(g)); saveError = false; } catch (e) { saveError = true; } }
 export function load() {
-  try { const raw = localStorage.getItem(KEY), s = JSON.parse(raw);
+  let raw = null;
+  try { raw = localStorage.getItem(KEY); const s = JSON.parse(raw);
     if (s && s.v === 4) g = { ...fresh(), ...s };
     else if (raw) localStorage.setItem(KEY + '_old', raw);        // ескі нұсқаның сақтауы жоғалмайды
-  } catch (e) {} g.t = 0;
+  } catch (e) { try { if (raw) localStorage.setItem(KEY + '_bad', raw); } catch (e2) {} }   // бұзылған сақтау да көшіріліп қалады
+  g.t = 0;
 }
 export function reset() { g = fresh(); save(); }
 
@@ -55,10 +57,10 @@ function finishCase() {
   if (s.stars === 2) why.push([false, `3 жұлдыз үшін көрсеткішті ${c.goal.top}${c.goal.u}-ге жеткізу керек еді.`]);
 
   let xp = Math.max(0, XP[s.stars] - XP[r.stars]); if (diagOk && !r.diag) { xp += XP_DIAG; r.diag = true; }
-  const feeNow = Math.round(c.fee * [0, 1, 1.5, 2][s.stars] * LEVELS[L0].fee), fee = Math.max(0, feeNow - r.paid);
+  const FM = [0, 1, 1.5, 2], fee = s.stars > r.stars ? Math.round(c.fee * (FM[s.stars] - FM[r.stars]) * LEVELS[L0].fee) : 0;   // тек жұлдыз өскенде төленеді
   if (s.ok && r.failed) grant('grit', ach);
   if (!s.ok && !r.stars) r.failed = true;
-  r.stars = Math.max(r.stars, s.stars); r.paid = Math.max(r.paid, feeNow); g.xp += xp; g.money += fee;
+  r.stars = Math.max(r.stars, s.stars); r.paid += fee; g.xp += xp; g.money += fee;
   if (s.ok) { grant('first', ach); if (s.stars === 3) grant('star3', ach);
     if (run.cash >= c.budget * .25) grant('thrift', ach); if (UPS.every(u => run.b.up[u[0]])) grant('funnel', ach); }
   if (CASES.filter(k => rec(k.id).diag).length >= 3) grant('diag3', ach);

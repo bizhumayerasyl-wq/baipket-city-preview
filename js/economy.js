@@ -9,6 +9,10 @@ export function newBiz(d, init = {}) {
     reg: init.reg || 0, cp: d.base, cpow: init.cpow || 1, evT: 0, evF: 0, up: {}, last: null };
 }
 
+// Жаңа клиенттің тұрақты клиентке айналу үлесі. Тұрақты клиент күніне 12% кемиді, қалғанының 35%-ы күнде келеді.
+export const retP = (d, b, x) => (b.up.rt ? .09 : .04) * ((x.of || {}).ret || 1) * (d.ret || 1) * (x.r || 1) * x.pm;
+export const VISITS = .35 / .12;   // бір тұрақты клиенттің орташа қайта келу саны
+
 // Бір күн. x — аудитория мен стратегияның әсері, cash — жарнамаға жұмсауға болатын ақша.
 export function simDay(d, b, x, cash) {
   const s = b.set, of = x.of || {}, P = s.P, chk = P * (b.up.mx ? 1.25 : 1) * (of.chk || 1);
@@ -28,7 +32,7 @@ export function simDay(d, b, x, cash) {
   const paid = Math.round(leads * k), back = Math.round(b.reg * .35);
   const clients = Math.min(d.cap, paid + Math.round(org * k) + back), fresh = Math.max(0, clients - back);
   const revenue = clients * chk, profit = revenue - clients * d.cogs - d.rent - ads;
-  b.reg = b.reg * .88 + fresh * (b.up.rt ? .09 : .04) * (of.ret || 1) * (d.ret || 1) * (x.r || 1) * x.pm;
+  b.reg = b.reg * .88 + fresh * retP(d, b, x);
   b.rep = clamp(b.rep * .98 + clients / (d.cap * .6) * (x.pm >= 1 ? 1 : .4), 0, 30);
   if (b.cpow < 1.8) b.cpow = Math.min(1.8, b.cpow + .015);
   if (b.evT > 0 && --b.evT === 0) { b.cp = d.base; b.evF = 0; }
@@ -79,14 +83,27 @@ export function mustOk(run, c, d) {
   const m = c.must; if (!m) return true;
   return m.k === 'leads' ? run.tot.leads >= m.v : m.k === 'sales' ? run.tot.paid >= m.v : m.k === 'spend' ? run.tot.ads >= m.v : run.minP >= d.base;
 }
+// Науқаннан кейінгі ай: иесі жарнамасыз жалғастырады (бизнестің көшірмесінде, түпнұсқа өзгермейді)
+export function afterMonth(b0, d, x, days = 30) {
+  const b = structuredClone(b0), reg0 = b.reg; Object.assign(b.set, { T: 0, S: 0, B: 0, O: 0 }); b.evT = 0; b.evF = 0; b.cp = d.base;
+  let profit = 0, clients = 0; for (let i = 0; i < days; i++) { const l = simDay(d, b, x, 0); profit += l.profit; clients += l.clients; }
+  return { profit, clients, reg0, reg: b.reg, days };
+}
+// Unit-экономика: LTV — бір жаңа клиенттің иесіне әкелетін маржасы (бірінші сатып алу + күтілетін қайта келулер), CAC — бір клиенттің жарнамалық бағасы
+export function unit(run, c, d, x = mods(c, run.pick)) {
+  const b = run.b, margin = b.last ? b.last.margin : 0, visits = 1 + retP(d, b, x) * VISITS, ltv = margin * visits, cac = run.tot.paid ? run.tot.ads / run.tot.paid : 0;
+  return { margin, visits, ltv, cac, ratio: cac ? ltv / cac : 0 };
+}
 // Ештеңе өзгертпегендегі иесінің пайдасы (жарнамасыз, оқиғасыз)
-export function baseline(c, d) {
+export function baseline(c, d, month = false) {
   const run = newRun(c, d, { seg: 0, pos: 0, off: 0 }); Object.assign(run.b.set, { T: 0, S: 0, B: 0, O: 0 });
   for (let i = 0; i < c.days; i++) stepRun(run, c, d, 1, NEUTRAL, false);
-  return run.tot.profit;
+  return month ? { profit: run.tot.profit, month: afterMonth(run.b, d, NEUTRAL) } : run.tot.profit;
 }
 export function score(run, c, d) {
   const val = metric(run, c), g = c.goal, p = (val - g.from) / (g.to - g.from), must = mustOk(run, c, d);
-  const profit = run.tot.profit - run.tot.up, base = baseline(c, d), ok = p >= 1 && must;
-  return { val, p, must, ok, profit, base, stars: !ok ? 0 : profit < base ? 1 : (val - g.from) / (g.top - g.from) < 1 ? 2 : 3 };
+  const profit = run.tot.profit - run.tot.up, B = baseline(c, d, true), base = B.profit, ok = p >= 1 && must, x = mods(c, run.pick);
+  const month = afterMonth(run.b, d, x), bmonth = B.month, long = profit + month.profit >= base + bmonth.profit;   // науқан + келесі ай
+  return { val, p, must, ok, profit, base, month, bmonth, long, unit: unit(run, c, d, x),
+    stars: !ok ? 0 : !long ? 1 : (val - g.from) / (g.top - g.from) < 1 ? 2 : 3 };
 }

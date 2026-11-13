@@ -1,6 +1,6 @@
 // Экономика мен баланс сынағы:  node tests/economy.test.mjs  (толық кесте үшін соңына -v қос)
 import { CASES, DEFS, UPS, defOf, DIST, GOAL } from '../js/data.js';
-import { newRun, stepRun, buyUp, score, baseline, metric, newBiz, simDay } from '../js/economy.js';
+import { newRun, stepRun, buyUp, score, baseline, metric, newBiz, simDay, afterMonth, unit, mods } from '../js/economy.js';
 
 const V = process.argv.includes('-v'); let fail = 0;
 const check = (ok, msg) => { console.log((ok ? '  ✓ ' : '  ✗ ') + msg); if (!ok) fail++; };
@@ -65,5 +65,23 @@ console.log('\nФитнес-клуб (өз бизнесі)');
   check(top.money > 0, 'дұрыс баптаумен пайда табуға болады');
   check(safe.money > 0, `бастапқы шығыны 600 мың ₸-ден аспайтын пайдалы баптау бар (T${safe.T} S${safe.S} B${safe.B} O${safe.O} P${safe.P}: ең төмен ${Math.round(safe.low)}, 60 күнде ${Math.round(safe.money)})`);
   check(top.money < GOAL * 2.4, '10 млн ₸ 25 күннен ерте жиналмайды'); }
+
+// Науқаннан кейінгі ай және unit-экономика (П1.1)
+console.log('\nБір айдан кейінгі нәтиже және LTV / CAC');
+{ const c = CASES[0], d = defOf(c.id), good = { seg: 2, pos: 3, off: 1 }, disc = { seg: 2, pos: 3, off: 0 };
+  const a = play(c, good, 'smart', ['rt']), snap = JSON.stringify(a.run.b); afterMonth(a.run.b, d, mods(c, good)); score(a.run, c, d);
+  check(JSON.stringify(a.run.b) === snap, 'келесі айдың есебі науқанның өз күйін өзгертпейді');
+  const b = play(c, disc, 'smart', ['rt']);
+  check(a.s.month.reg > b.s.month.reg * 1.3, `жинақ картасы жеңілдіктен көп тұрақты клиент қалдырады (${Math.round(a.s.month.reg)} / ${Math.round(b.s.month.reg)})`);
+  const nort = play(c, good, 'smart', []);
+  check(a.s.month.reg > nort.s.month.reg, 'тұрақты клиент жүйесі бір айдан кейін көбірек клиент қалдырады');
+  check(a.s.month.reg > a.s.bmonth.reg, 'дұрыс стратегия науқансыз нұсқадан көп тұрақты клиент қалдырады');
+  const u = unit(a.run, c, d), l = a.run.b.last;
+  check(Math.abs(u.ltv - u.margin * u.visits) < 1e-6 && u.visits > 1 && Math.abs(u.cac - a.run.tot.ads / a.run.tot.paid) < 1e-6, 'LTV = маржа × келу саны, CAC = жарнама ÷ клиент');
+  check(u.margin === l.margin && Math.abs(u.ratio - u.ltv / u.cac) < 1e-9, 'LTV / CAC дұрыс есептеледі');
+  const z = unit(newRun(c, d, good), c, d); check(z.cac === 0 && z.ratio === 0, 'жарнамасыз CAC 0 (бөлу қатесі жоқ)');
+  let bad = 0; for (const k of CASES) { const dd = defOf(k.id); for (let off = 0; off < 3; off++) { const r = play(k, { seg: k.segOk, pos: k.segs[k.segOk].pos, off }, 'smart', []); if (r.s.ok && !r.s.long && r.s.stars > 1) bad++; } }
+  check(bad === 0, 'ұзақ мерзімде зиян болса, 1 жұлдыздан аспайды');
+}
 
 console.log(fail ? `\n${fail} тексеріс өтпеді` : '\nБарлық тексеріс өтті'); process.exit(fail ? 1 : 0);

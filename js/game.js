@@ -53,7 +53,10 @@ function finishCase() {
   why.push([!run.waste && !run.broke, `Бюджет: ${Math.round((c.budget - run.cash) / c.budget * 100)}% жұмсалды.` +
     (run.waste ? ` ${run.waste} күн блогерге минимумнан аз ақша кетіп, нәтиже бермеді.` : '') + (run.broke ? ` ${run.broke} күн бюджет жетпей, жарнама тоқтады.` : '')]);
   if (c.must && !s.must) why.push([false, `Шарт орындалмады: ${c.must.t}.`]);
-  if (s.stars === 1) why.push([false, `Мақсатқа жеттің, бірақ иесінің пайдасы (${Math.round(s.profit).toLocaleString('ru-RU')} ₸) науқансыз болатыннан (${Math.round(s.base).toLocaleString('ru-RU')} ₸) төмен: маркетинг өзін ақтамады.`]);
+  const f = n => Math.round(n).toLocaleString('ru-RU') + ' ₸', kept = Math.round(s.month.reg), keptB = Math.round(s.bmonth.reg);
+  why.push([kept > keptB, kept > keptB ? `Бір айдан кейін: ${kept} тұрақты клиент қалды (науқансыз ${keptB} болар еді) — нәтиже науқан біткен соң да жұмыс істейді.`
+    : `Бір айдан кейін: тұрақты клиент ${kept} (науқансыз ${keptB}). Науқан біткен соң клиенттер ұсталмады.`]);
+  if (s.stars === 1) why.push([false, `Мақсатқа жеттің, бірақ иесінің пайдасы науқан мен келесі айда ${f(s.profit + s.month.profit)} — науқансыз ${f(s.base + s.bmonth.profit)} болар еді: маркетинг өзін ақтамады.`]);
   if (s.stars === 2) why.push([false, `3 жұлдыз үшін көрсеткішті ${c.goal.top}${c.goal.u}-ге жеткізу керек еді.`]);
 
   let xp = Math.max(0, XP[s.stars] - XP[r.stars]); if (diagOk && !r.diag) { xp += XP_DIAG; r.diag = true; }

@@ -190,13 +190,24 @@ function doDay() {
   else if (o.win) modal(`<h2>🏆 Қала аңызы</h2><p>Капиталың ${fmt(GOAL)}-ден асты. Junior маркетологтан бастап, бес бизнестің мәселесін шешіп, өз ісіңді аштың.</p><p>Бүкіл тізбекті өттің: сегмент → позициялау → оффер → трафик → лид → клиент → тұрақты клиент.</p><p class="dim">Az-azdan, üzdiksiz.</p><button class="b1" data-a="ok">Жалғастыру</button>`, { ok: closeModal });
   renderPanel(); drawHud();
 }
+// LTV / CAC: бір клиент әкелетіні мен оны тартудың бағасы
+function unitCard(u) {
+  const v = u.ratio, cls = !u.cac ? '' : v < 1 ? 'bad' : 'good',
+    say = !u.cac ? 'Жарнамадан клиент келмеді — CAC есептелмейді.' : v < 1 ? 'Клиентті тарту оның әкелетінінен қымбат: жарнама зиянға жұмыс істейді.'
+      : v < 3 ? 'Клиент өзін ақтайды, бірақ қор аз.' : 'Клиент тартуға жұмсалған ақша еселеніп қайтады: жарнаманы ұлғайтуға болады.';
+  return `<b>Бір клиенттің экономикасы</b><div class="tiles"><div class="tile"><small>LTV — әкелетіні</small><b>${fmt(u.ltv)}</b><span>маржа ${fmt(u.margin)} × ${u.visits.toFixed(1).replace(".", ",")} рет келу</span></div>
+    <div class="tile"><small>CAC — тарту бағасы</small><b>${u.cac ? fmt(u.cac) : '—'}</b><span>жарнама ÷ жарнамадан келген клиент</span></div>
+    <div class="tile wide"><small>LTV / CAC</small><b class="${cls}">${u.cac ? v.toFixed(1).replace(".", ",") : '—'}</b><span>${say} Кемінде 1 болуы керек.</span></div></div>`;
+}
 function showResult(r) {
   const { c, s } = r, G = c.goal; refreshLots(); paused = false;
   modal(`<div class="dim">${c.name} · кейс қорытындысы</div><h2>${s.ok ? 'Мақсат орындалды' : 'Мақсатқа жетпедің'} ${stars(s.stars)}</h2>
     <table><tr><td>Көрсеткіш</td><td>${num(G.from)}${G.u} → <b class="${s.p >= 1 ? 'good' : 'bad'}">${num(s.val)}${G.u}</b> (мақсат ${num(G.to)}${G.u})</td></tr>
     ${c.must ? `<tr><td>Шарт</td><td class="${s.must ? 'good' : 'bad'}">${c.must.t}: ${s.must ? 'орындалды' : 'орындалмады'}</td></tr>` : ''}
-    <tr><td>Иесінің пайдасы</td><td><span class="${s.profit >= s.base ? 'good' : 'bad'}">${fmt(s.profit)}</span> <span class="dim">(науқансыз ${fmt(s.base)} болар еді)</span></td></tr>
+    <tr><td>Иесінің пайдасы, науқан</td><td><span class="${s.profit >= s.base ? 'good' : 'bad'}">${fmt(s.profit)}</span> <span class="dim">(науқансыз ${fmt(s.base)})</span></td></tr>
+    <tr><td>Келесі айда</td><td><span class="${s.month.profit >= s.bmonth.profit ? 'good' : 'bad'}">${fmt(s.month.profit)}</span> <span class="dim">(науқансыз ${fmt(s.bmonth.profit)})</span><br><span class="dim">жарнамасыз; тұрақты клиент ${num(s.month.reg0)} → ${num(s.month.reg)}</span></td></tr>
     <tr><td>Бюджет қалдығы</td><td>${fmt(r.left)}</td></tr></table>
+    ${unitCard(s.unit)}
     <b>Не болды және неге</b>${r.why.map(([ok, t]) => `<div class="why ${ok ? 'good' : 'bad'}">${ok ? '✓' : '✗'} <span>${t}</span></div>`).join('')}
     <blockquote>📚 ${c.lesson}</blockquote>
     <p><b>Сыйақы:</b> ${r.xp || r.fee ? `+${r.xp} XP · +${fmt(r.fee)}` : s.ok ? 'бұл нәтиже бұрынғыңнан жоғары емес — жаңа сыйақы жоқ' : 'жоқ. Кейсті қайта өтуге болады'}</p>

@@ -2,7 +2,7 @@
 import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
-import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats } from './world.js';
+import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg } from './world.js';
 
 const $ = id => document.getElementById(id);
 const num = n => Math.round(n).toLocaleString('ru-RU'), fmt = n => num(n) + ' ₸';
@@ -316,4 +316,4 @@ startLoop(dt => {
   frame(dt, frozen);
   if (started && (hudT -= dt) <= 0) { hudT = .2; drawHud(); }
 });
-if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients };   // тек әзірлеу кезінде
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients, dbg };   // тек әзірлеу кезінде

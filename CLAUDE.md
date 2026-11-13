@@ -22,6 +22,7 @@
 | Негізгі репозиторий | `github.com/bizhumayerasyl-wq/marketolog-qalasy` (remote `origin`) |
 | Тірі сайт (ескі нұсқа, тиіспе) | https://bizhumayerasyl-wq.github.io/marketolog-qalasy/ — `main`, коммит `b333561` |
 | Preview сайты (жаңа нұсқа) | https://bizhumayerasyl-wq.github.io/baipket-city-preview/ — бөлек репозиторий, remote `preview` |
+| Жобаның қалтасы | `/Users/erasyl/Baipket city` (git тарихымен бірге көшірілген) |
 | Жұмыс тармағы | `phase-1` (жергілікті және preview-да; `origin`-ге жүктелмеген) |
 | Ескі нұсқаның белгісі | `v0-original` (жергілікті тег) |
 
@@ -59,7 +60,7 @@ Preview-ды жаңарту: `git push preview phase-1:main` (өздігінен
 |---|---|
 | 0. Аудит | Бітті |
 | 1. Негізгі ойын | Бітті, тексерілді (`PHASE_1_VERIFICATION.md`) |
-| 2. UX/UI, дизайн, орыс тілі (қазақша негізгі, тіл ауыстырғыш) | Жоспарлануда (`PHASE_2A_UX_PLAN.md`); іске асыру рұқсат күтеді |
+| 2. UX/UI, дизайн, орыс тілі (қазақша негізгі, тіл ауыстырғыш) | 2А жоспары дайын (`PHASE_2A_UX_PLAN.md`); іске асыру рұқсат күтеді. 2Ә — орыс тілі |
 | 3. Қосымша кейстер, тармақталу, қиындық | — |
 | 4. Сақтау жүйесі | — |
 | 5. iPhone-ға бейімдеу | — |

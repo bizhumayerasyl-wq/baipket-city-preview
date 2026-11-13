@@ -13,7 +13,7 @@ const PLAN = { coffee: [2, 3, 1, 1, { T: 3000, S: 3000, B: 0, O: 0 }, ['rt']],
   edu: [0, 1, 0, 1, { T: 18000, S: 0, B: 0, O: 18000 }, ['lm', 'tw']],
   shop: [1, 2, 1, 2, { T: 27000, S: 0, B: 27000, O: 0 }, ['tw', 'mx']] };
 function playCase(id, plan = PLAN[id], stopAfter = 99) {
-  const [seg, pos, off, diag, set, ups] = plan; Gm.startCase(id, { seg, pos, off }, diag); Object.assign(g().run.b.set, set); ups.forEach(k => Gm.buyCaseUp(k));
+  const [seg, pos, off, diag, set, ups] = plan; Gm.startCase(id, { seg, pos, off }, diag, { v: 0, seed: CASES.findIndex(c => c.id === id) + 1 }); Object.assign(g().run.b.set, set); ups.forEach(k => Gm.buyCaseUp(k));
   let res = null; for (let i = 0; i < stopAfter && !res; i++) res = Gm.endDay().result; return res;
 }
 
@@ -35,7 +35,7 @@ const m0 = g().money, x0 = g().xp; r = playCase('coffee');
 check(r.xp === 0 && r.fee === 0 && g().money === m0 && g().xp === x0, 'сол нәтижені қайталағанда сыйақы қайта берілмейді');
 
 console.log('\nСақтау және жалғастыру');
-Gm.startCase('cloth', { seg: 1, pos: 3, off: 1 }, 0); Object.assign(g().run.b.set, PLAN.cloth[4]); Gm.buyCaseUp('lm'); Gm.buyCaseUp('tw');
+Gm.startCase('cloth', { seg: 1, pos: 3, off: 1 }, 0, { v: 0, seed: 2 }); Object.assign(g().run.b.set, PLAN.cloth[4]); Gm.buyCaseUp('lm'); Gm.buyCaseUp('tw');
 for (let i = 0; i < 4; i++) Gm.endDay();
 const snap = JSON.stringify(g()); Gm.load();
 check(JSON.stringify({ ...g(), t: JSON.parse(snap).t }) === snap, 'кейстің ортасында сақтап, қайта жүктегенде күй дәл сол');
@@ -74,5 +74,23 @@ Gm.reset(); g().intro = true; for (const id of Object.keys(PLAN)) playCase(id); 
 if (Gm.level() < 4) for (const id of Object.keys(PLAN)) playCase(id);
 Gm.buyFit(); const out = []; for (let i = 0; i < 12 && g().biz.fit; i++) out.push(Gm.endDay().bankrupt);
 check(out.includes(true) && !g().biz.fit && Gm.fitCost() === 500000 && g().money >= 500000, `жарнамасыз клуб ${out.length} күнде банкротқа ұшырады, 500 000 ₸ қайтты, қайта сатып алу 500 000 ₸`);
+
+console.log('\nКейс нұсқалары');
+{ const VP = { 1: [0, 2, 0, 1, { T: 5400, S: 0, B: 0, O: 5400 }, []], 2: [1, 1, 1, 1, { T: 4200, S: 0, B: 0, O: 4200 }, ['tw', 'mx']] };
+  const playV = (v, plan) => { const [seg, pos, off, diag, set, ups] = plan; Gm.startCase('coffee', { seg, pos, off }, diag, { v, seed: 3 }); Object.assign(g().run.b.set, set); ups.forEach(k => Gm.buyCaseUp(k));
+    let res = null; while (!res) res = Gm.endDay().result; return res; };
+  Gm.reset(); g().intro = true;
+  let r = playV(0, [0, 0, 0, 0, {}, []]); check(!r.s.ok && Gm.curVar('coffee') === 0 && r.next === null, 'сәтсіз болса, сол тапсырыс қайта беріледі');
+  r = playV(0, PLAN.coffee); const v = Gm.curVar('coffee');
+  check(r.s.stars === 3 && v > 0 && r.next === v, `сәтті болса, иесі басқа мәселемен шақырады (келесі нұсқа ${v + 1})`);
+  const x0 = g().xp, m0 = g().money; r = playV(v, VP[v]);
+  check(r.s.ok && r.xp > 0 && r.fee > 0 && g().xp > x0 && g().money > m0, `жаңа нұсқа кейс 3★ болса да жаңа сыйақы береді (${r.s.stars}★, +${r.xp} XP, +${r.fee} ₸)`);
+  const w = Gm.curVar('coffee'); check(w !== v && w !== 0, `екі нұсқадан кейін әлі өтілмеген нұсқа беріледі (${w + 1})`);
+  r = playV(v, VP[v]); check(r.xp === 0 && r.fee === 0, 'сол нұсқаны сол нәтижемен қайталау сыйақы бермейді');
+  const ok = Object.entries(VP).every(([k, p]) => { Gm.reset(); g().intro = true; g().xp = 200; return playV(+k, p).s.stars >= 2; });
+  check(ok, 'әр нұсқаның дұрыс стратегиясы сәтті');
+  Gm.reset(); g().intro = true; g().cases.coffee = { stars: 3, tries: 1, failed: false, diag: true, paid: 120000 };   // нұсқаға дейінгі сақтау
+  r = playV(0, PLAN.coffee); check(r.xp === 0 && r.fee === 0 && Gm.rec('coffee').vs[0] === 3, 'ескі сақтау: бұрынғы нәтиже 1-нұсқаға жазылады, сыйақы қайталанбайды');
+}
 
 console.log(fail ? `\n${fail} тексеріс өтпеді` : '\nБарлық тексеріс өтті'); process.exit(fail ? 1 : 0);

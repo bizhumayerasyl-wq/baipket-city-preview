@@ -1,5 +1,5 @@
 // Интерфейс пен негізгі цикл.
-import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
+import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
 import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place } from './world.js';
@@ -78,7 +78,7 @@ function action() {
   if (st === 'lock') return toast(`${c.name} әзірге саған сенбейді. Бұл тапсырыс «${LEVELS[c.lvl].n}» деңгейінде ашылады.`);
   if (st === 'run') return openPanel('case');
   if (g().run) return toast(`Алдымен ағымдағы кейсті аяқта: ${caseOf(g().run.id).name}.`);
-  wiz = { c, step: 0, pick: {} }; renderWiz();
+  wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz();
 }
 
 // ---------- Кейс шебері: бриф → диагноз → сегмент → позиция → оффер → іске қосу ----------
@@ -87,7 +87,8 @@ function renderWiz() {
   const opt = (i, title, sub, sel) => `<button class="opt${sel ? ' on' : ''}" data-a="pick" data-i="${i}"><b>${title}</b>${sub ? `<br><span>${sub}</span>` : ''}</button>`;
   const head = (n, t, hint) => `<div class="dim">${n}-қадам, барлығы 4 · ${c.name}</div><h2>${t}</h2><p class="dim">${hint}</p>`, back = '<button class="b2" data-a="back">← Артқа</button>';
   let h;
-  if (step === 0) h = `<h2>${d.e} ${c.name}</h2>${r.stars ? `<p>Үздік нәтижең: ${stars(r.stars)}</p>` : ''}<p>${c.desc}</p><p>${c.aud}</p>
+  const vb = r.vs ? r.vs[c.v] || 0 : c.v ? 0 : r.stars;
+  if (step === 0) h = `<h2>${d.e} ${c.name}</h2>${nVars(c) > 1 ? `<div class="dim">Тапсырыс ${c.v + 1}/${nVars(c)}${c.v && r.stars ? ' · иесі сені қайта шақырды' : ''}</div>` : ''}${vb ? `<p>Осы тапсырыстағы үздік нәтижең: ${stars(vb)}</p>` : ''}<p>${c.desc}</p><p>${c.aud}</p>
     <blockquote><b>${c.owner}, иесі:</b> «${c.say}»</blockquote>
     <table><tr><td>Мақсат</td><td><b>${c.goal.t}</b>${c.must ? `<br>Шарт: ${c.must.t}` : ''}</td></tr>
     <tr><td>Бюджет</td><td>${fmt(c.budget)} (жарнама мен воронкаға)</td></tr><tr><td>Мерзім</td><td>${c.days} күн</td></tr>
@@ -113,7 +114,7 @@ let panelSec = 'ads';
 function openPanel(kind) { panelKind = kind || (g().run ? 'case' : g().biz.fit ? 'own' : null); if (!panelKind) return; $('panel').style.display = 'block'; $('panel').classList.remove('min', 'full'); renderPanel(); }
 function closePanel() { $('panel').style.display = 'none'; }
 const panelOpen = () => $('panel').style.display === 'block';
-const pctx = () => { const isCase = panelKind === 'case', run = g().run, c = isCase && caseOf(run.id), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit, D = DIST[d.d];
+const pctx = () => { const isCase = panelKind === 'case', run = g().run, c = isCase && Gm.runCase(), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit, D = DIST[d.d];
   return { isCase, run, c, d, b, m: isCase ? c.segs[run.pick.seg].m : { T: D.mT, S: D.mS, B: D.mB, O: D.mO } }; };
 function renderPanel() {
   if (panelKind === 'case' && !g().run) panelKind = g().biz.fit ? 'own' : null;
@@ -213,8 +214,9 @@ function showResult(r) {
     <p><b>Сыйақы:</b> ${r.xp || r.fee ? `+${r.xp} XP · +${fmt(r.fee)}` : s.ok ? 'бұл нәтиже бұрынғыңнан жоғары емес — жаңа сыйақы жоқ' : 'жоқ. Кейсті қайта өтуге болады'}</p>
     ${r.ach.map(a => `<p>${a[1]} Жаңа жетістік: <b>${a[2]}</b></p>`).join('')}
     ${r.lvlUp ? `<p class="lvl">⬆ Жаңа деңгей: <b>${r.lvlUp.n}</b><br>${r.lvlUp.open}</p>` : ''}
+    ${r.next != null ? `<p class="note">📞 ${c.owner} риза. Келесі жолы ол <b>басқа мәселемен</b> шақырады — бизнеске қайта барсаң, жаңа тапсырыс күтеді.</p>` : ''}
     <div class="row"><button class="b2" data-a="again">Қайта өту</button><button class="b1" data-a="ok">Жабу</button></div>`,
-  { ok: closeModal, again: () => { wiz = { c, step: 1, pick: {} }; renderWiz(); } });
+  { ok: closeModal, again: () => { wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz(); } });
 }
 
 // ---------- Профиль мен глоссарий ----------

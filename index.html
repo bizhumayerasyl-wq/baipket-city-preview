@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Маркетолог қаласы</title>
+<title>Baipket: Маркетолог қаласы</title>
 <style>
   html,body{margin:0;height:100%;overflow:hidden;background:#8ec9f5;font-family:system-ui,-apple-system,sans-serif;color:#fff;
     -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
@@ -32,11 +32,13 @@
   #gl{top:8px;left:8px;right:8px;bottom:8px;overflow:auto;display:none;z-index:9;font-size:14px;line-height:1.7}
   .up{display:block;width:100%;text-align:left;margin-top:5px;background:#222;color:#FFD400;border:1px solid #FFD400;border-radius:8px;padding:6px 8px;font-size:13px}
   .up span{color:#aab;font-size:12px}
+  #brand{position:fixed;left:50%;bottom:4px;transform:translateX(-50%);font-size:11px;color:#000;background:#FFD400;border-radius:8px;padding:2px 8px;white-space:nowrap;pointer-events:none}
   .good{color:#7CFC9A}.bad{color:#ff8a80}.dim{color:#aab}
 </style>
 </head>
 <body>
 <div id="hud" class="box"></div>
+<div id="brand"><b>Baipket</b> · Жабайы бизнеске қарсымыз!</div>
 <canvas id="map" width="104" height="104"></canvas>
 <div id="toast" class="box"></div>
 <div id="stick"><div id="knob"></div></div>
@@ -349,7 +351,7 @@ function drawHud() {
 
 // ================= Іске қосу =================
 load(); DEFS.forEach(buildLot);
-toast(mobile ? 'Сол жақтағы джойстикпен жүр. Сары алаңға барып, бизнес аш.' : 'W/S — жүру, A/D — бұрылу, E — әрекет, F — көлік. Сары алаңға барып, бизнес аш.', 9000);
+toast('<b style="color:#FFD400">Baipket: Маркетолог қаласы</b><br>Az-azdan, üzdiksiz.<br>' + (mobile ? 'Сол жақтағы джойстикпен жүр. Сары алаңға барып, бизнес аш.' : 'W/S — жүру, A/D — бұрылу, E — әрекет, F — көлік. Сары алаңға барып, бизнес аш.'), 9000);
 const clock = new THREE.Clock(), look = new THREE.Vector3(); let hudT = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), .05);

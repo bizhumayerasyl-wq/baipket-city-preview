@@ -59,8 +59,14 @@ export function newRun(c, d, pick) {
   return { id: c.id, pick, b: newBiz(d, c.init), cash: c.budget, day: 0, minP: d.base, hist: [],
     tot: { ads: 0, leads: 0, paid: 0, clients: 0, profit: 0, up: 0, gm: 0 } };
 }
+// Шешім оқиғаларының уақытша әсері: run.fx = [{ days, lead, conv, chk, ret, cpow }]
+function withFx(run, x) { const f = run.fx; if (!f || !f.length) return x; const of = { ...(x.of || {}) };
+  for (const e of f) { for (const k of ['lead', 'conv', 'chk', 'ret']) if (e[k]) of[k] = (of[k] || 1) * e[k]; if (e.cpow && !e.on) { run.b.cpow += e.cpow; e.on = 1; } }
+  return { ...x, of }; }
+function tickFx(run) { if (!run.fx) return; for (const e of run.fx) if (--e.days <= 0 && e.on) run.b.cpow -= e.cpow; run.fx = run.fx.filter(e => e.days > 0); }
+
 export function stepRun(run, c, d, seed = 1, x = mods(c, run.pick), events = true) {
-  const l = simDay(d, run.b, x, run.cash), t = run.tot;
+  const l = simDay(d, run.b, withFx(run, x), run.cash), t = run.tot; tickFx(run);
   run.cash -= l.ads; run.day++; run.minP = Math.min(run.minP, run.b.set.P);
   t.ads += l.ads; t.leads += l.leads; t.paid += l.paid; t.clients += l.clients; t.profit += l.profit; t.gm += l.paid * l.margin;
   run.hist.push([l.clients ? l.back / l.clients : 0, l.share]);

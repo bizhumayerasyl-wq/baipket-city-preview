@@ -2,7 +2,7 @@
 import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
-import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place } from './world.js';
+import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats } from './world.js';
 
 const $ = id => document.getElementById(id);
 const num = n => Math.round(n).toLocaleString('ru-RU'), fmt = n => num(n) + ' ₸';
@@ -52,7 +52,7 @@ function begin() {
     <p>Мақсатың — Junior маркетологтан өз бизнесі бар кәсіпкерге дейін өсу.</p>
     <p class="dim">${mobile ? 'Сол жақтағы джойстикпен жүр.' : 'W/S — жүру, A/D — бұрылу, E — әрекет, F — көлік.'} Алғашқы тапсырыс — жақын жердегі сары белгісі бар кофейня.</p>
     <button class="b1" data-a="go">Бастау</button>`, { go: () => { g().intro = true; Gm.save(); closeModal(); } });
-  else if (g().run) openPanel('case');
+  else if (g().run) { openPanel('case'); if (Gm.pendingEvent()) showEvent(); }
 }
 
 // ---------- Қаладағы белгілер ----------
@@ -187,6 +187,7 @@ function doDay() {
   o.ach.forEach(showAch);
   if (Gm.saveError) toast('<span class="bad">Прогресс сақталмады: браузер жадына жазу мүмкін болмады.</span>', 6000);
   if (o.result) showResult(o.result);
+  else if (o.event) showEvent();
   else if (o.bankrupt) { refreshLots(); modal(`<h2>Клуб сатылды</h2><p>Ақшаң 3 күн қатарынан минуста болды. Банк клубты сатып, қарызды жапты. Қолыңда ${fmt(g().money)} қалды.</p><p>PDCA: жоспарла → жаса → тексер → түзет. Клубты ${fmt(Gm.fitCost())}-ге қайта сатып алып, басқа стратегиямен көруге болады.</p><button class="b1" data-a="ok">Түсінікті</button>`, { ok: closeModal }); }
   else if (o.win) modal(`<h2>🏆 Қала аңызы</h2><p>Капиталың ${fmt(GOAL)}-ден асты. Junior маркетологтан бастап, бес бизнестің мәселесін шешіп, өз ісіңді аштың.</p><p>Бүкіл тізбекті өттің: сегмент → позициялау → оффер → трафик → лид → клиент → тұрақты клиент.</p><p class="dim">Az-azdan, üzdiksiz.</p><button class="b1" data-a="ok">Жалғастыру</button>`, { ok: closeModal });
   renderPanel(); drawHud();
@@ -200,6 +201,18 @@ function unitCard(u) {
     <div class="tile"><small>CAC — тарту бағасы</small><b>${u.cac ? fmt(u.cac) : '—'}</b><span>жарнама ÷ жарнамадан келген клиент</span></div>
     <div class="tile wide"><small>LTV / CAC</small><b class="${cls}">${u.cac ? v.toFixed(1).replace(".", ",") : '—'}</b><span>${say} Кемінде 1 болуы керек.</span></div></div>`;
 }
+// ---------- Шешім оқиғасы: науқан кідіріп, ойыншы таңдайды ----------
+function showEvent() {
+  const e = Gm.pendingEvent(); if (!e) return; paused = true; const run = g().run;
+  modal(`<div class="dim">Күн ${run.day}/${Gm.runCase().days} · ${Gm.runCase().name} · шешім керек</div><h2>${e.e} ${e.title}</h2><p>${Gm.evText(e)}</p>` +
+    e.opts.map((o, i) => { const cost = Gm.evCost(o), no = cost > run.cash;
+      return `<button class="opt"${no ? ' disabled' : ''} data-a="ch" data-i="${i}"><b>${o.t}</b><br><span>${o.d}${cost ? ` · ${fmt(cost)}` : ''}${no ? ' · бюджет жетпейді' : ''}</span></button>`; }).join('') +
+    `<p class="dim">Бюджет қалдығы: ${fmt(run.cash)}. Шешімнің салдары келесі күндердің есебінде көрінеді.</p>`,
+  { ch: ({ i }) => { const r = Gm.chooseEvent(+i); if (!r) return;
+    modal(`<div class="dim">${Gm.runCase().name} · ${e.title}</div><h2>${r.good === true ? '✓ Жақсы шешім' : r.good === false ? '✗ Тиімсіз шешім' : '• Аз әсер'}</h2>
+      <p class="why ${r.good === true ? 'good' : r.good === false ? 'bad' : 'dim'}"><span>${r.why}</span></p>${r.fx ? `<p class="dim">Әсері ${r.fx.days} күн бойы есепте болады.</p>` : ''}
+      <button class="b1" data-a="ok">Науқанды жалғастыру</button>`, { ok: () => { closeModal(); paused = false; renderPanel(); } }); } });
+}
 function showResult(r) {
   const { c, s } = r, G = c.goal; refreshLots(); paused = false;
   modal(`<div class="dim">${c.name} · кейс қорытындысы</div><h2>${s.ok ? 'Мақсат орындалды' : 'Мақсатқа жетпедің'} ${stars(s.stars)}</h2>
@@ -209,7 +222,7 @@ function showResult(r) {
     <tr><td>Келесі айда</td><td><span class="${s.month.profit >= s.bmonth.profit ? 'good' : 'bad'}">${fmt(s.month.profit)}</span> <span class="dim">(науқансыз ${fmt(s.bmonth.profit)})</span><br><span class="dim">жарнамасыз; тұрақты клиент ${num(s.month.reg0)} → ${num(s.month.reg)}</span></td></tr>
     <tr><td>Бюджет қалдығы</td><td>${fmt(r.left)}</td></tr></table>
     ${unitCard(s.unit)}
-    <b>Не болды және неге</b>${r.why.map(([ok, t]) => `<div class="why ${ok ? 'good' : 'bad'}">${ok ? '✓' : '✗'} <span>${t}</span></div>`).join('')}
+    <b>Не болды және неге</b>${r.why.map(([ok, t]) => `<div class="why ${ok ? 'good' : ok === null ? 'dim' : 'bad'}">${ok ? '✓' : ok === null ? '•' : '✗'} <span>${t}</span></div>`).join('')}
     <blockquote>📚 ${c.lesson}</blockquote>
     <p><b>Сыйақы:</b> ${r.xp || r.fee ? `+${r.xp} XP · +${fmt(r.fee)}` : s.ok ? 'бұл нәтиже бұрынғыңнан жоғары емес — жаңа сыйақы жоқ' : 'жоқ. Кейсті қайта өтуге болады'}</p>
     ${r.ach.map(a => `<p>${a[1]} Жаңа жетістік: <b>${a[2]}</b></p>`).join('')}
@@ -303,4 +316,4 @@ startLoop(dt => {
   frame(dt, frozen);
   if (started && (hudT -= dt) <= 0) { hudT = .2; drawHud(); }
 });
-if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame };   // тек әзірлеу кезінде
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients };   // тек әзірлеу кезінде

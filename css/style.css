@@ -60,7 +60,7 @@ button { font-family: inherit; cursor: pointer; }
 #card table { width: 100%; border-collapse: collapse; margin: 8px 0; } #card td { padding: 5px 6px; border-top: 1px solid #333; vertical-align: top; } #card td:first-child { color: #aab; white-space: nowrap; }
 blockquote { margin: 10px 0; padding: 8px 10px; background: #24262c; border-left: 3px solid var(--y); border-radius: 6px; }
 .opt { display: block; width: 100%; text-align: left; margin: 6px 0; background: #24262c; color: #fff; border: 1px solid #444; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
-.opt:hover, .opt:active { border-color: var(--y); }
+.opt:hover, .opt:active { border-color: var(--y); } .opt:disabled { opacity: .45; border-color: #333; }
 .why { display: flex; gap: 6px; margin: 4px 0; } .why span { color: #dde; }
 .lvl { background: #2a2600; border: 1px solid var(--y); border-radius: 8px; padding: 8px 10px; }
 #start { background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.75)); flex-direction: column; text-align: center; }

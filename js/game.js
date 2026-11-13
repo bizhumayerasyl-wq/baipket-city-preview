@@ -1,5 +1,5 @@
 // Ойын күйі мен ережелері: мансап, кейстер, өз бизнесі, жетістіктер, сақтау. Экранға тәуелсіз.
-import { CASES, caseOf, caseV, nVars, defOf, DIST, LEVELS, XP, XP_DIAG, UPS, ACH, POS, GOAL } from './data.js';
+import { CASES, caseOf, caseV, nVars, defOf, DIST, LEVELS, XP, XP_DIAG, UPS, ACH, POS, GOAL, EVENTS } from './data.js';
 import { newBiz, simDay, rivalEvent, newRun, stepRun, buyUp, score, metric, mods } from './economy.js';
 
 const KEY = 'mq2', fresh = () => ({ v: 4, money: 50000, xp: 0, day: 1, t: 0, cases: {}, run: null, ach: {}, biz: {}, neg: 0, won: false, intro: false, fitCost: 0 });
@@ -43,7 +43,26 @@ function grant(id, out) { if (!g.ach[id]) { g.ach[id] = 1; out.push(ACH.find(a =
 // opt.v, opt.seed — тек сынақ үшін; ойында нұсқа rec.v-дан, бәсекелес оқиғаларының күндері кездейсоқ
 export function startCase(id, pick, diag, opt = {}) {
   const v = opt.v ?? curVar(id), c = caseV(id, v); g.run = newRun(c, defOf(id), pick); g.run.v = v; g.run.seed = opt.seed ?? 1 + Math.floor(Math.random() * 997);
-  g.run.diag = diag; g.run.waste = 0; g.run.broke = 0; rec(id).tries++; g.t = 0; save();
+  g.run.diag = diag; g.run.waste = 0; g.run.broke = 0; rec(id).tries++; g.t = 0;
+  // Екі шешім оқиғасы: тұқымға қарай таңдалады, 3- және 6-күннен кейін
+  const sd = g.run.seed, a = sd % EVENTS.length, b = (a + 1 + (sd * 7) % (EVENTS.length - 1)) % EVENTS.length;
+  g.run.evs = [[EV_DAYS[0], EVENTS[a].id], [EV_DAYS[1], EVENTS[b].id]]; g.run.evLog = []; save();
+}
+const EV_DAYS = [3, 6];
+export const pendingEvent = () => g.run && g.run.pend ? EVENTS.find(e => e.id === g.run.pend) : null;
+const evCtx = () => { const c = runCase(); return { c, d: defOf(c.id), seg: c.segs[g.run.pick.seg], run: g.run }; };
+export const evCost = o => o.cost ? Math.round(o.cost * runCase().budget) : 0;
+export const evText = e => e.text(evCtx());
+// Оқиғаға жауап: шығын, бірден әсер (репутация, жазылушы, баға) және бірнеше күндік әсер. Ақша жетпесе — null.
+export function chooseEvent(i) {
+  const e = pendingEvent(), o = e && e.opts[i]; if (!o) return null;
+  const run = g.run, x = evCtx(), d = x.d, cost = evCost(o); if (cost > run.cash) return null;
+  const r = o.fn(x), n = r.now || {}; run.cash -= cost; run.tot.up += cost; if (o.ads) run.tot.ads += cost;
+  if (n.rep) run.b.rep = Math.max(0, Math.min(30, run.b.rep + n.rep)); if (n.fol) run.b.fol += n.fol;
+  if (n.P) { const P = Math.round(run.b.set.P * n.P / d.ps) * d.ps; run.b.set.P = Math.max(d.pmin, Math.min(d.pmax, P)); }
+  if (r.fx) (run.fx || (run.fx = [])).push({ ...r.fx });
+  run.evLog.push([r.good, `${e.e} ${e.title} → «${o.t}». ${r.why}`]); run.pend = null; save();
+  return { ...r, cost, e, o };
 }
 export function buyCaseUp(k) { const ok = buyUp(g.run, k, upCost(k, true)); if (ok) save(); return ok; }
 
@@ -58,6 +77,7 @@ function finishCase() {
   why.push([run.pick.off === c.offOk, `Оффер: ${of.why}`]);
   why.push([!run.waste && !run.broke, `Бюджет: ${Math.round((c.budget - run.cash) / c.budget * 100)}% жұмсалды.` +
     (run.waste ? ` ${run.waste} күн блогерге минимумнан аз ақша кетіп, нәтиже бермеді.` : '') + (run.broke ? ` ${run.broke} күн бюджет жетпей, жарнама тоқтады.` : '')]);
+  for (const [ok, t] of run.evLog || []) why.push([ok, t]);
   if (c.must && !s.must) why.push([false, `Шарт орындалмады: ${c.must.t}.`]);
   const f = n => Math.round(n).toLocaleString('ru-RU') + ' ₸', kept = Math.round(s.month.reg), keptB = Math.round(s.bmonth.reg);
   why.push([kept > keptB, kept > keptB ? `Бір айдан кейін: ${kept} тұрақты клиент қалды (науқансыз ${keptB} болар еді) — нәтиже науқан біткен соң да жұмыс істейді.`
@@ -96,7 +116,8 @@ export function endDay() {
   if (g.run) { const c = runCase(), d = defOf(g.run.id), { l, ev } = stepRun(g.run, c, d, g.run.seed || CASES.findIndex(k => k.id === c.id) + 1);
     if (l.waste) g.run.waste++; if (l.broke) g.run.broke++;
     out.day = { l, d, val: metric(g.run, c), c }; out.ev = ev && [d, ev];
-    if (g.run.day >= c.days) out.result = finishCase(); }
+    if (g.run.day >= c.days) out.result = finishCase();
+    else { const ev = (g.run.evs || []).find(([day]) => day === g.run.day); if (ev) { g.run.pend = ev[1]; out.event = pendingEvent(); } } }
   if (g.biz.fit) { const d = defOf('fit'), D = DIST[d.d], b = g.biz.fit;
     const l = simDay(d, b, { m: { T: D.mT, S: D.mS, B: D.mB, O: D.mO }, w: D.w, q: 1, pm: 1, r: 1, of: {} }, Math.max(0, g.money));
     g.money += l.profit; out.own = { l, d }; const ev = rivalEvent(d, b, Math.random(), Math.random()); if (ev && !out.ev) out.ev = [d, ev];

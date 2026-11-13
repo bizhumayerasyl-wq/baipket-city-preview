@@ -94,51 +94,69 @@ function renderWiz() {
 }
 
 // ---------- Басқару панелі (кейс немесе өз бизнесі) ----------
-function openPanel(kind) { panelKind = kind || (g().run ? 'case' : g().biz.fit ? 'own' : null); if (!panelKind) return; $('panel').style.display = 'block'; renderPanel(); }
+let panelSec = 'ads';
+function openPanel(kind) { panelKind = kind || (g().run ? 'case' : g().biz.fit ? 'own' : null); if (!panelKind) return; $('panel').style.display = 'block'; $('panel').classList.remove('min'); renderPanel(); }
 function closePanel() { $('panel').style.display = 'none'; }
 const panelOpen = () => $('panel').style.display === 'block';
+const pctx = () => { const isCase = panelKind === 'case', run = g().run, c = isCase && caseOf(run.id), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit, D = DIST[d.d];
+  return { isCase, run, c, d, b, m: isCase ? c.segs[run.pick.seg].m : { T: D.mT, S: D.mS, B: D.mB, O: D.mO } }; };
 function renderPanel() {
   if (panelKind === 'case' && !g().run) panelKind = g().biz.fit ? 'own' : null;
   if (panelKind === 'own' && !g().biz.fit) panelKind = g().run ? 'case' : null;
   if (!panelKind) return closePanel();
-  const isCase = panelKind === 'case', run = g().run, c = isCase && caseOf(run.id), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit;
-  const D = DIST[d.d], m = isCase ? c.segs[run.pick.seg].m : { T: D.mT, S: D.mS, B: D.mB, O: D.mO };
+  const { isCase, run, c, d, b } = pctx();
   $('ptabs').innerHTML = g().run && g().biz.fit ? `<button class="${isCase ? 'on' : ''}" data-a="tab" data-k="case">📋 Кейс</button><button class="${isCase ? '' : 'on'}" data-a="tab" data-k="own">🏋️ Клуб</button>` : '';
-  $('ctl').innerHTML = `<b>${d.e} ${isCase ? c.name : 'Фитнес-клуб (сенікі)'}</b><div id="phead"></div>
-    <div class="row"><button class="b2" data-a="pause" id="pz"></button><button class="b2" data-a="skip">Келесі күн ⏭</button></div>` +
-    CH.map(([k, n]) => `<label><span>${n} <span class="dim">×${m[k]}</span></span><span id="v${k}"></span></label>
-      <input type="range" data-k="${k}" min="0" max="${d.adMax}" step="${d.adMax / 30}" value="${b.set[k]}">`).join('') +
-    `<label><span>Баға</span><span id="vP"></span></label><input type="range" data-k="P" min="${d.pmin}" max="${d.pmax}" step="${d.ps}" value="${b.set.P}">
-    <div class="dim" id="burn"></div><b>Воронка элементтері</b>` +
-    UPS.map(([k, n, t]) => b.up[k] ? `<div class="good">✓ ${n}</div>` : `<button class="up" data-a="up" data-k="${k}">${n} — ${fmt(Gm.upCost(k, isCase))}<br><span>${t}</span></button>`).join('');
+  $('ctl').innerHTML = `<div class="ptitle">${d.e} ${isCase ? c.name : 'Фитнес-клуб (сенікі)'}</div><div id="phead"></div>
+    <div class="row"><button class="b2" data-a="pause" id="pz"></button><button class="b2" data-a="skip">Келесі күн ⏭</button></div>
+    <div class="seg">${[['ads', 'Жарнама'], ['fun', 'Воронка'], ['res', 'Нәтиже']].map(([k, n]) => `<button class="${panelSec === k ? 'on' : ''}" data-a="sec" data-k="${k}">${n}</button>`).join('')}</div><div id="sec"></div>`;
   $('pfoot').innerHTML = isCase ? '<button class="lnk" data-a="quit">Кейстен бас тарту</button>' : `<button class="lnk" data-a="sell">Клубты сату (${fmt(d.cost / 2)})</button>`;
-  const show = () => { for (const k of 'TSBOP') $('v' + k).textContent = fmt(b.set[k]);
-    const ads = b.set.T + b.set.S + b.set.B + b.set.O, cash = isCase ? run.cash : g().money, left = isCase ? c.days - run.day : 0;
-    $('burn').innerHTML = `Күніне жарнамаға: <b>${fmt(ads)}</b>` + (isCase && ads ? (ads * left > cash ? ` · <span class="bad">бюджет ${Math.floor(cash / ads)} күнге ғана жетеді</span>` : ` · ${left} күнге жетеді`) : '') +
-      (b.set.B > 0 && b.set.B < d.blogMin ? `<br><span class="bad">Блогер ${fmt(d.blogMin)}-ден аз ақшаға жұмыс істемейді — бұл ақша күйеді.</span>` : ''); };
-  $('ctl').querySelectorAll('input').forEach(x => x.oninput = () => { b.set[x.dataset.k] = +x.value; show(); });
-  show(); renderStats();
-  pacts = { tab: ({ k }) => { panelKind = k; renderPanel(); }, pause: () => { paused = !paused; renderStats(); }, skip: () => doDay(),
+  renderSec(); renderStats();
+  pacts = { tab: ({ k }) => { panelKind = k; renderPanel(); }, sec: ({ k }) => { panelSec = k; renderPanel(); }, min: () => $('panel').classList.toggle('min'),
+    pause: () => { paused = !paused; renderStats(); }, skip: () => doDay(),
+    st: ({ k, s }) => { const i = $('ctl').querySelector(`input[data-k=${k}]`); i.value = +i.value + s * +i.step; i.dispatchEvent(new Event('input')); },
     up: ({ k }) => { if (!(isCase ? Gm.buyCaseUp(k) : Gm.buyOwnUp(k))) return toast('Ақша жетпейді: ' + fmt(Gm.upCost(k, isCase))); renderPanel(); },
     quit: () => confirmBox('Кейстен бас тартсаң, ол сәтсіз деп есептеледі. Кейін қайта алуға болады.', () => { Gm.quitCase(); refreshLots(); renderPanel(); }, 'Бас тарту'),
     sell: () => confirmBox(`Клубты ${fmt(d.cost / 2)}-ге сатасың ба?`, () => { Gm.sellFit(); refreshLots(); renderPanel(); }, 'Сату') };
 }
+// Таңдалған бөлім: жарнама слайдерлері, воронка немесе нәтиже
+function renderSec() {
+  const { isCase, run, c, d, b, m } = pctx(), sec = $('sec');
+  if (panelSec === 'res') return;                       // нәтижені renderStats толтырады
+  if (panelSec === 'fun') { sec.innerHTML = '<p class="hint">Воронка элементі бір рет сатып алынады және соңына дейін жұмыс істейді.</p>' +
+    UPS.map(([k, n, t]) => b.up[k] ? `<div class="upd good">✓ ${n}<span>${t}</span></div>` : `<button class="up" data-a="up" data-k="${k}"><b>${n}</b> — ${fmt(Gm.upCost(k, isCase))}<span>${t}</span></button>`).join(''); return; }
+  const tag = v => v >= 1.2 ? `<span class="tg good">күшті ×${v}</span>` : v <= .7 ? `<span class="tg bad">әлсіз ×${v}</span>` : `<span class="tg">орташа ×${v}</span>`;
+  const ctl = (k, n, sub, min, max, step) => `<div class="sl"><div class="slh"><span>${n} ${sub}</span><b id="v${k}"></b></div>
+    <div class="slr"><button data-a="st" data-k="${k}" data-s="-1" aria-label="Азайту">−</button><input type="range" data-k="${k}" min="${min}" max="${max}" step="${step}" value="${b.set[k]}"><button data-a="st" data-k="${k}" data-s="1" aria-label="Көбейту">+</button></div></div>`;
+  sec.innerHTML = `<p class="hint">Әр каналға <b>күніне</b> қанша жұмсайсың? ${isCase ? 'Белгі — таңдаған аудиторияңа каналдың әсері.' : ''}</p>` +
+    CH.map(([k, n]) => ctl(k, n, tag(m[k]), 0, d.adMax, d.adMax / 30)).join('') + `<div id="burn" class="note"></div>` + ctl('P', 'Баға', `<span class="tg">бәсекелесте ${fmt(b.cp)}</span>`, d.pmin, d.pmax, d.ps);
+  const show = () => { for (const k of 'TSBOP') $('v' + k).textContent = fmt(b.set[k]);
+    const ads = b.set.T + b.set.S + b.set.B + b.set.O, cash = isCase ? run.cash : g().money, left = isCase ? c.days - run.day : 0;
+    $('burn').innerHTML = `Барлығы күніне: <b>${fmt(ads)}</b>` + (isCase && ads ? (ads * left > cash ? `<br><span class="bad">Бюджет ${Math.floor(cash / ads)} күнге ғана жетеді (қалғаны ${left} күн)</span>` : `<br><span class="good">Қалған ${left} күнге жетеді</span>`) : '') +
+      (b.set.B > 0 && b.set.B < d.blogMin ? `<br><span class="bad">Блогер ${fmt(d.blogMin)}-ден аз ақшаға жұмыс істемейді — бұл ақша күйеді</span>` : ''); };
+  sec.querySelectorAll('input').forEach(x => x.oninput = () => { b.set[x.dataset.k] = +x.value; show(); });
+  show();
+}
 function renderStats() {
   if (!panelOpen() || !panelKind) return;
-  const isCase = panelKind === 'case', run = g().run; if (isCase && !run) return renderPanel();
-  const c = isCase && caseOf(run.id), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit, l = b.last, cl = v => v >= 0 ? 'good' : 'bad';
+  if (panelKind === 'case' && !g().run) return renderPanel();
+  const { isCase, run, c, d, b } = pctx(), l = b.last, cl = v => v >= 0 ? 'good' : 'bad';
   $('pz').textContent = paused ? '▶ Жалғастыру' : '⏸ Кідірту';
   if (isCase) { const G = c.goal, val = metric(run, c), p = Math.max(0, Math.min(1, (val - G.from) / (G.to - G.from)));
-    $('phead').innerHTML = `Күн ${run.day}/${c.days} · Бюджет қалдығы: <b>${fmt(run.cash)}</b><br>🎯 ${G.t}${c.must ? ` <span class="dim">(${c.must.t})</span>` : ''}
-      <div class="bar"><i style="width:${p * 100}%"></i></div>Қазір: <b>${num(val)}${G.u}</b> · мақсат ${num(G.to)}${G.u} · 3★ үшін ${num(G.top)}${G.u}`; }
-  else $('phead').innerHTML = `Ақшаң: <b class="${cl(g().money)}">${fmt(g().money)}</b>${g().neg ? ` <span class="bad">минуста ${g().neg}/3 күн</span>` : ''}`;
-  $('stats').innerHTML = `Бәсекелес бағасы: <b>${fmt(b.cp)}</b>${b.evT ? ' ⚔️' : ''} · Репутация: ${b.rep.toFixed(1)}/30<br>Жазылушы: ${num(b.fol)} · Тұрақты клиент: ${num(b.reg)}` +
-    (l ? `<br><b>Кешегі воронка</b>${l.broke ? ' <span class="bad">(ақша жетпей, жарнама тоқтады)</span>' : ''}
-      <br>Қаралым ${num(l.imp)} → Лид ${l.leads} → Клиент ${l.clients}/${d.cap}${l.full ? ' <span class="bad">толды — бағаны көтер</span>' : ''}
-      <br><span class="dim">жарнамадан сатып алған: ${l.paid} · қайтып келген: ${l.back}</span>
-      <br>Лид → клиент: ${Math.round(l.conv * 100)}% · Нарық үлесі: ${Math.round(l.share * 100)}%
-      <br>CPL: ${l.cpl ? fmt(l.cpl) : '—'} · CAC: ${l.cac ? fmt(l.cac) : '—'} · ROI: <span class="${cl(l.roi)}">${l.ads ? Math.round(l.roi) + '%' : '—'}</span>
-      <br>Түсім: ${fmt(l.revenue)} · Жарнама: ${fmt(l.ads)}<br>${isCase ? 'Иесінің пайдасы' : 'Пайда'}: <span class="${cl(l.profit)}">${fmt(l.profit)}</span>` : '<br><span class="dim">Бірінші күннің нәтижесі әлі жоқ.</span>');
+    $('phead').innerHTML = `<div class="kv"><span>Күн <b>${run.day}</b>/${c.days}</span><span>Бюджет: <b>${fmt(run.cash)}</b></span></div>
+      <div class="goal">🎯 ${G.t}${c.must ? `<br><span class="dim">Шарт: ${c.must.t}</span>` : ''}</div>
+      <div class="bar big"><i style="width:${p * 100}%"></i></div><div class="kv"><span>Қазір: <b class="${p >= 1 ? 'good' : ''}">${num(val)}${G.u}</b></span><span class="dim">мақсат ${num(G.to)}${G.u} · 3★: ${num(G.top)}${G.u}</span></div>`; }
+  else $('phead').innerHTML = `<div class="kv"><span>Ақшаң: <b class="${cl(g().money)}">${fmt(g().money)}</b></span>${g().neg ? `<span class="bad">минуста ${g().neg}/3 күн</span>` : ''}</div>`;
+  if (panelSec !== 'res') return;
+  const tile = (n, v, cap, cls = '') => `<div class="tile"><small>${n}</small><b class="${cls}">${v}</b><span>${cap}</span></div>`;
+  $('sec').innerHTML = !l ? '<p class="hint">Бірінші күннің нәтижесі әлі жоқ. ▶ басып уақытты жүргіз немесе «Келесі күн» бас.</p>' :
+    `<p class="hint">Кешегі күн${l.broke ? ' · <span class="bad">ақша жетпей, жарнама тоқтады</span>' : ''}${l.full ? ' · <span class="bad">орын толды — бағаны көтеруге болады</span>' : ''}</p>
+    <div class="fun3"><div><small>Көрді</small><b>${num(l.imp)}</b></div><i>→</i><div><small>Лид</small><b>${l.leads}</b></div><i>→</i><div><small>Клиент</small><b>${l.clients}</b><small>${d.cap} орыннан</small></div></div>
+    <div class="tiles">${tile('CPL', l.cpl ? fmt(l.cpl) : '—', 'бір лидтің бағасы') + tile('CAC', l.cac ? fmt(l.cac) : '—', 'бір клиенттің бағасы') +
+      tile('ROI', l.ads ? Math.round(l.roi) + '%' : '—', 'жарнаманың қайтарымы', l.ads ? cl(l.roi) : '') + tile('Конверсия', Math.round(l.conv * 100) + '%', 'лидтен клиентке') +
+      tile('Нарық үлесі', Math.round(l.share * 100) + '%', 'бәсекелеспен салыстырғанда') + tile('Қайтып келген', l.back, `${l.clients} клиенттің ішінде`) +
+      tile('Түсім', fmt(l.revenue), 'бір күнде') + tile('Жарнама', fmt(l.ads), 'бір күнде') +
+      `<div class="tile wide"><small>${isCase ? 'Иесінің пайдасы' : 'Пайда'}</small><b class="${cl(l.profit)}">${fmt(l.profit)}</b><span>түсім − өзіндік құн − жалға алу − жарнама</span></div>`}</div>
+    <div class="note">Бәсекелес бағасы: <b>${fmt(b.cp)}</b>${b.evT ? ' ⚔️' : ''} · Репутация: <b>${b.rep.toFixed(1)}</b>/30<br>Жазылушы: <b>${num(b.fol)}</b> · Тұрақты клиент: <b>${num(b.reg)}</b></div>`;
 }
 
 // ---------- Күн соңы ----------

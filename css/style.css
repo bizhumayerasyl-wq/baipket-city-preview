@@ -11,11 +11,11 @@ button { font-family: inherit; cursor: pointer; }
 #map { position: fixed; top: calc(8px + var(--st)); right: 8px; border-radius: 10px; background: rgba(15,20,30,.84); }
 #next { position: fixed; top: calc(120px + var(--st)); left: 8px; right: 8px; max-width: 520px; box-sizing: border-box; background: var(--y); color: #222; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 1.35; display: none; pointer-events: none; }
 #toast { top: calc(176px + var(--st)); left: 8px; right: 60px; margin: auto; max-width: 440px; text-align: center; display: none; font-size: 14px; z-index: 6; box-sizing: border-box; }
-#stick { position: fixed; left: 18px; bottom: calc(18px + var(--nh) + var(--sb)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.14); touch-action: none; }
+#stick { position: fixed; left: 18px; bottom: calc(18px + var(--nh) + var(--sb) + var(--ph, 0px)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.14); touch-action: none; }
 #knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.55); pointer-events: none; }
 .btn { position: fixed; right: 16px; border: 0; border-radius: 14px; padding: 13px 16px; font-size: 15px; font-weight: 700; display: none; max-width: 60vw; }
-#act { bottom: calc(22px + var(--nh) + var(--sb)); background: var(--y); color: #222; }
-#car { bottom: calc(80px + var(--nh) + var(--sb)); background: var(--r); color: #fff; }
+#act { bottom: calc(22px + var(--nh) + var(--sb) + var(--ph, 0px)); background: var(--y); color: #222; }
+#car { bottom: calc(80px + var(--nh) + var(--sb) + var(--ph, 0px)); background: var(--r); color: #fff; }
 #nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; display: none; background: rgba(16,17,21,.96); border-top: 1px solid #2c2d33; padding: 0 4px var(--sb); }
 #nav button { flex: 1; height: var(--nh); background: none; border: 0; color: #aab; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; position: relative; padding: 0; }
 #nav button i { font-style: normal; font-size: 22px; line-height: 1; filter: grayscale(.6); opacity: .8; }
@@ -68,4 +68,15 @@ blockquote { margin: 10px 0; padding: 8px 10px; background: #24262c; border-left
 #start p { font-size: 17px; margin: 8px 0 26px; }
 #startBtns { display: flex; flex-direction: column; gap: 10px; width: min(280px, 80vw); } #startBtns button { padding: 14px; font-size: 16px; }
 #start small { margin-top: 26px; color: #ddd; }
+/* Төменгі парақ (bottom sheet): тұтқа, жартылай / толық күй */
+.grab { height: 34px; margin: -12px -8px 0; display: flex; justify-content: center; align-items: center; touch-action: none; cursor: grab; }
+.grab::before { content: ''; width: 42px; height: 5px; border-radius: 3px; background: #555; }
+#nav { display: none; } body.play #nav { display: flex; } body.lock #nav { opacity: .35; }
+@media (min-width: 601px) { #card .grab { display: none; } #panel .grab { display: none; } }
+@media (max-width: 600px) {
+  body.play #modal { bottom: calc(var(--nh) + var(--sb)); align-items: flex-end; padding: var(--st) 0 0; background: rgba(0,0,0,.28); }
+  body.play #card { width: 100%; max-height: 62vh; border-radius: 16px 16px 0 0; padding-top: 8px; transition: max-height .2s; }
+  body.play #card.full { max-height: 100%; } body.play #card .grab { margin: -8px -8px 0; }
+  #panel { max-height: 55vh; transition: max-height .2s; } #panel.full { max-height: calc(100% - 8px - var(--nh) - var(--st) - var(--sb)); }
+}
 #loading { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #17181c; font-size: 16px; text-align: center; padding: 20px; }

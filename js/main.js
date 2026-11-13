@@ -7,6 +7,8 @@ import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCa
 const $ = id => document.getElementById(id);
 const num = n => Math.round(n).toLocaleString('ru-RU'), fmt = n => num(n) + ' ₸';
 const g = () => Gm.g;
+let modalDis = false, modalTab = null;
+const narrow = matchMedia('(max-width: 600px)');
 let paused = false, modalOn = false, started = false, panelKind = null, wiz = null, acts = {}, pacts = {};
 
 // ---------- Хабарламалар кезегі ----------
@@ -16,8 +18,21 @@ function nextToast() { const q = queue.shift(), t = $('toast'); if (!q) { toastB
   toastBusy = true; t.innerHTML = q[0]; t.style.display = 'block'; setTimeout(nextToast, q[1]); }
 
 // ---------- Модал терезе ----------
-function modal(html, handlers = {}) { acts = handlers; $('card').innerHTML = html; $('modal').style.display = 'flex'; $('card').scrollTop = 0; modalOn = true; }
-function closeModal() { $('modal').style.display = 'none'; modalOn = false; }
+// opt.dis — қалаға не басқа бөлімге басқанда жабылады; opt.tab — навигацияда белгіленетін бөлім
+function modal(html, handlers = {}, opt = {}) { acts = handlers; modalDis = !!opt.dis; modalTab = opt.tab || null;
+  $('card').innerHTML = '<div class="grab" aria-label="Кеңейту"></div>' + html; $('card').classList.remove('full'); $('modal').style.display = 'flex'; $('card').scrollTop = 0; modalOn = true;
+  document.body.classList.toggle('lock', !modalDis); }
+function closeModal() { $('modal').style.display = 'none'; modalOn = false; document.body.classList.remove('lock'); }
+$('modal').addEventListener('click', e => { if (e.target === $('modal') && modalDis) closeModal(); });
+// Тұтқа: жоғары сүйреу — толық экран, төмен — жию/жабу, басу — ауыстыру
+function grab(box, up, down, tap) { let y0 = null;
+  box.addEventListener('pointerdown', e => { if (!e.target.closest('.grab')) return; y0 = e.clientY; e.target.setPointerCapture(e.pointerId); });
+  box.addEventListener('pointerup', e => { if (y0 == null) return; const d = e.clientY - y0; y0 = null; d < -25 ? up() : d > 25 ? down() : tap(); });
+  box.addEventListener('pointercancel', () => y0 = null); }
+const CC = $('card').classList, PC = $('panel').classList;
+grab($('card'), () => CC.add('full'), () => CC.contains('full') ? CC.remove('full') : modalDis && closeModal(), () => CC.toggle('full'));
+grab($('panel'), () => PC.contains('min') ? PC.remove('min') : PC.add('full'), () => PC.contains('full') ? PC.remove('full') : PC.contains('min') ? closePanel() : PC.add('min'),
+  () => PC.contains('min') ? PC.remove('min') : PC.toggle('full'));
 document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el) return; const h = el.closest('#panel') ? pacts : acts; if (h[el.dataset.a]) h[el.dataset.a](el.dataset); });
 const confirmBox = (text, yes, yesLabel = 'Иә') => modal(`<p>${text}</p><div class="row"><button class="b2" data-a="no">Жоқ</button><button class="b1" data-a="yes">${yesLabel}</button></div>`,
   { no: closeModal, yes: () => { closeModal(); yes(); } });
@@ -30,7 +45,7 @@ function showStart() {
   acts = { cont: () => begin(), new: () => { if (Gm.hasSave()) { $('start').style.display = 'none'; confirmBox('Сақталған ойын өшіп, бәрі басынан басталады. Жалғастырасың ба?', () => { Gm.reset(); begin(); }, 'Иә, басынан'); acts.no = () => { closeModal(); showStart(); }; } else { Gm.reset(); begin(); } } };
 }
 function begin() {
-  $('start').style.display = 'none'; started = true; paused = false; refreshLots(); panelKind = null;
+  $('start').style.display = 'none'; started = true; document.body.classList.add('play'); paused = false; refreshLots(); panelKind = null;
   if (g().px != null) place(g().px, g().pz);
   if (!g().intro) modal(`<h2>BAIPKET CITY-ге қош келдің</h2><p>Сен — қалаға жаңа келген жас маркетологсың. Қалтаңда 50 000 ₸, атың әлі ешкімге таныс емес.</p>
     <p>Қаладағы бизнестердің әрқайсысында шешілмеген мәселе бар. Иесімен сөйлес, мәселені тап, стратегия құр да, оның бюджетімен нәтиже көрсет. Жақсы жұмыс — гонорар, тәжірибе және жаңа тапсырыс.</p>
@@ -95,7 +110,7 @@ function renderWiz() {
 
 // ---------- Басқару панелі (кейс немесе өз бизнесі) ----------
 let panelSec = 'ads';
-function openPanel(kind) { panelKind = kind || (g().run ? 'case' : g().biz.fit ? 'own' : null); if (!panelKind) return; $('panel').style.display = 'block'; $('panel').classList.remove('min'); renderPanel(); }
+function openPanel(kind) { panelKind = kind || (g().run ? 'case' : g().biz.fit ? 'own' : null); if (!panelKind) return; $('panel').style.display = 'block'; $('panel').classList.remove('min', 'full'); renderPanel(); }
 function closePanel() { $('panel').style.display = 'none'; }
 const panelOpen = () => $('panel').style.display === 'block';
 const pctx = () => { const isCase = panelKind === 'case', run = g().run, c = isCase && caseOf(run.id), d = defOf(isCase ? run.id : 'fit'), b = isCase ? run.b : g().biz.fit, D = DIST[d.d];
@@ -200,7 +215,7 @@ function showProfile() {
     <b>Жетістіктер (${ACH.filter(a => g().ach[a[0]]).length}/${ACH.length})</b>${ACH.map(a => `<div class="${g().ach[a[0]] ? '' : 'dim'}">${g().ach[a[0]] ? a[1] : '▫️'} <b>${a[2]}</b> — ${a[3]}</div>`).join('')}
     <div class="row"><button class="b2" data-a="glo">📖 Глоссарий</button><button class="b1" data-a="ok">Жабу</button></div>
     <div class="row"><button class="lnk" data-a="reset">Ойынды қайта бастау</button></div><p class="dim" style="text-align:center">BAIPKET CITY · Ойна. Үйрен. Бизнесті дамыт.</p>`,
-  { ok: closeModal, glo: showGlos, reset: () => confirmBox('Бүкіл прогресс өшеді. Қайта бастайсың ба?', () => { Gm.reset(); closePanel(); begin(); }, 'Иә, өшір') });
+  { ok: closeModal, glo: showGlos, reset: () => confirmBox('Бүкіл прогресс өшеді. Қайта бастайсың ба?', () => { Gm.reset(); closePanel(); begin(); }, 'Иә, өшір') }, { dis: true, tab: 'me' });
 }
 // ---------- Төменгі навигация: Қала / Жұмыс / Статистика / Профиль ----------
 function goTab(t) {
@@ -212,7 +227,7 @@ function showWork() {
   const lbl = (st, c) => st === 'open' ? (Gm.rec(c.id).tries ? 'қайта өтуге болады' : '<span class="good">Жаңа тапсырыс</span>') : st === 'run' ? 'жүріп жатыр' : '';
   modal(`<h2>💼 Жұмыс</h2><p class="lvl">▸ ${Gm.objective()}</p><b>Тапсырыстар</b>` +
     CASES.map(c => { const st = Gm.caseState(c.id); return `<div>${defOf(c.id).e} ${c.name} — ${st === 'lock' ? `<span class="dim">🔒 ${LEVELS[c.lvl].n}</span>` : st === 'done' ? stars(Gm.rec(c.id).stars) : lbl(st, c)}</div>`; }).join('') +
-    `<p class="dim">Тапсырыс алу үшін қаладағы бизнеске бар (картадағы сары белгі).</p><button class="b1" data-a="ok">Қалаға оралу</button>`, { ok: closeModal });
+    `<p class="dim">Тапсырыс алу үшін қаладағы бизнеске бар (картадағы сары белгі).</p><button class="b1" data-a="ok">Қалаға оралу</button>`, { ok: closeModal }, { dis: true, tab: 'work' });
 }
 function showStats() {
   const s = g(), L = Gm.level(), nx = LEVELS[L + 1], done = CASES.filter(c => Gm.caseState(c.id) === 'done').length,
@@ -221,9 +236,9 @@ function showStats() {
   modal(`<h2>📈 Статистика</h2><div class="tiles">${tile('Ақша', fmt(s.money), 'сенің қалтаңда') + tile('Тәжірибе', s.xp + ' XP', nx ? `келесі деңгейге ${nx.xp - s.xp} XP` : 'ең жоғары деңгей') +
     tile('Кейстер', `${done}/${CASES.length}`, 'аяқталған') + tile('Жұлдыз', `${st}/${CASES.length * 3}`, 'барлық кейстерде')}<div class="tile wide"><small>Жетістіктер</small><b>${ach}/${ACH.length}</b><span>толығы Профильде</span></div></div>` +
     (Gm.active() ? '<button class="b2" data-a="run" style="display:block;width:100%;margin-top:10px">📊 Науқанның күндік көрсеткіштері</button>' : '<p class="dim">Науқан көрсеткіштері (лид, конверсия, CPL, ROI) кейс жүріп жатқанда осында шығады.</p>') +
-    '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal, run: () => { closeModal(); panelSec = 'res'; openPanel(); } });
+    '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal, run: () => { closeModal(); panelSec = 'res'; openPanel(); } }, { dis: true, tab: 'stat' });
 }
-const showGlos = () => modal('<h2>📖 Глоссарий</h2>' + GLOS.map(([a, b]) => `<div><b>${a}</b> — ${b}</div>`).join('') + '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal });
+const showGlos = () => modal('<h2>📖 Глоссарий</h2>' + GLOS.map(([a, b]) => `<div><b>${a}</b> — ${b}</div>`).join('') + '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal }, { dis: true, tab: 'me' });
 
 // ---------- Жоғарғы тақта мен карта ----------
 const mapCtx = $('map').getContext('2d'), COL = { lock: '#777', open: '#FFD400', run: '#1e88e5', done: '#7CFC9A', sale: '#FFD400', own: '#7CFC9A' };
@@ -232,16 +247,18 @@ function drawHud() {
   $('hud').innerHTML = `💰 <b>${fmt(s.money)}</b> · ⭐ ${LEVELS[L].n}<div class="bar"><i style="width:${nx ? (s.xp - lo) / (nx.xp - lo) * 100 : 100}%"></i></div>` +
     `<span class="dim">📍 ${D.n}${Gm.active() ? ` · Күн ${s.day}${paused ? ' ⏸' : ''}` : ''}</span>` +
     (Gm.active() ? `<div class="bar thin"><i style="width:${s.t / DAY * 100}%"></i></div>` : '');
-  const d = nearLot(), near = d && !W.inCar && !modalOn && started;
+  const pn = narrow.matches && panelOpen(), sheet = modalOn || (pn && !PC.contains('min'));   // телефонда парақ ашық — джойстик пен батырмалар жасырын
+  const ph = pn && !sheet ? $('panel').offsetHeight + 'px' : '0px'; if (document.body.style.getPropertyValue('--ph') !== ph) document.body.style.setProperty('--ph', ph);   // жиылған панельдің үстінде
+  if ($('stick').hidden !== sheet) { $('stick').hidden = sheet; if (sheet) { W.joy.x = W.joy.y = 0; knob.style.transform = ''; } }
+  const d = nearLot(), near = d && !W.inCar && !sheet && started;
   $('act').style.display = near ? 'block' : 'none';
   if (near) { const st = d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id);
     $('act').textContent = st === 'lock' ? `🔒 ${d.n}` : st === 'run' || st === 'own' ? `${d.e} Басқару${mobile ? '' : ' (E)'}` : st === 'sale' ? `${d.e} Сатып алу` : st === 'done' ? `${d.e} Қайта өту` : `${d.e} Иесімен сөйлесу${mobile ? '' : ' (E)'}`; }
-  $('car').style.display = nearCar() && !modalOn ? 'block' : 'none'; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';
+  $('car').style.display = nearCar() && !sheet ? 'block' : 'none'; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';
   const city = started && !modalOn && !panelOpen(), obj = Gm.objective();
   $('next').style.display = city ? 'block' : 'none'; if ($('next').dataset.t !== obj) { $('next').dataset.t = obj; $('next').textContent = '▸ ' + obj; }
-  $('nav').style.display = started ? 'flex' : 'none';
   const dot = { work: !Gm.active() && (CASES.some(c => Gm.caseState(c.id) === 'open') || Gm.fitState() === 'sale') };
-  for (const b of $('nav').children) { b.classList.toggle('on', b.dataset.t === (panelOpen() ? 'work' : 'city')); b.classList.toggle('dot', !!dot[b.dataset.t]); }
+  for (const b of $('nav').children) { b.classList.toggle('on', b.dataset.t === (modalOn ? modalTab : panelOpen() ? 'work' : 'city')); b.classList.toggle('dot', !!dot[b.dataset.t]); }
   const k = 104 / 200, q = v => (v + 100) * k; mapCtx.clearRect(0, 0, 104, 104);
   for (const d of DEFS) { mapCtx.fillStyle = COL[d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id)]; mapCtx.fillRect(q(d.x) - 4, q(d.z) - 4, 8, 8); }
   mapCtx.fillStyle = '#e53935'; mapCtx.fillRect(q(carPos().x) - 2, q(carPos().z) - 2, 4, 4);
@@ -261,7 +278,7 @@ stick.onpointerdown = e => { stick.setPointerCapture(e.pointerId); joyMove(e); }
 stick.onpointermove = e => { if (stick.hasPointerCapture(e.pointerId)) joyMove(e); };
 stick.onpointerup = stick.onpointercancel = () => { W.joy.x = W.joy.y = 0; knob.style.transform = ''; };
 $('act').onclick = action; $('car').onclick = car; $('x').onclick = closePanel;
-$('nav').onclick = e => { const b = e.target.closest('button'); if (b && started && !modalOn) goTab(b.dataset.t); };
+$('nav').onclick = e => { const b = e.target.closest('button'); if (!b || !started || (modalOn && !modalDis)) return; if (modalOn) closeModal(); goTab(b.dataset.t); };
 
 // ---------- Іске қосу ----------
 initWorld(); Gm.load(); refreshLots(); showStart(); $('loading').remove(); window.__started = true;

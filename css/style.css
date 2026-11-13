@@ -1,4 +1,4 @@
-:root { --y: #FFD400; --r: #D11F33; --bg: rgba(0,0,0,.88); --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px); }
+:root { --nh: 58px; --y: #FFD400; --r: #D11F33; --bg: rgba(0,0,0,.88); --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px); }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #8ec9f5; font-family: system-ui, -apple-system, sans-serif; color: #fff;
   -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
 canvas { display: block; touch-action: none; }
@@ -9,18 +9,21 @@ button { font-family: inherit; cursor: pointer; }
 .bar { height: 5px; background: #333; border-radius: 3px; margin: 4px 0; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--y); }
 .bar.thin { height: 3px; margin-bottom: 0; }
 #map { position: fixed; top: calc(8px + var(--st)); right: 8px; border-radius: 10px; background: rgba(15,20,30,.84); }
-.rb { position: fixed; right: 8px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--y); font-size: 20px; }
-#glo { top: calc(120px + var(--st)); } #me { top: calc(172px + var(--st)); }
-#toast { top: calc(132px + var(--st)); left: 8px; right: 60px; margin: auto; max-width: 440px; text-align: center; display: none; font-size: 14px; z-index: 6; box-sizing: border-box; }
-#stick { position: fixed; left: 18px; bottom: calc(26px + var(--sb)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.14); touch-action: none; }
+#next { position: fixed; top: calc(120px + var(--st)); left: 8px; right: 8px; max-width: 520px; box-sizing: border-box; background: var(--y); color: #222; border-radius: 12px; padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 1.35; display: none; pointer-events: none; }
+#toast { top: calc(176px + var(--st)); left: 8px; right: 60px; margin: auto; max-width: 440px; text-align: center; display: none; font-size: 14px; z-index: 6; box-sizing: border-box; }
+#stick { position: fixed; left: 18px; bottom: calc(18px + var(--nh) + var(--sb)); width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.14); touch-action: none; }
 #knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.55); pointer-events: none; }
 .btn { position: fixed; right: 16px; border: 0; border-radius: 14px; padding: 13px 16px; font-size: 15px; font-weight: 700; display: none; max-width: 60vw; }
-#act { bottom: calc(30px + var(--sb)); background: var(--y); color: #222; }
-#car { bottom: calc(88px + var(--sb)); background: var(--r); color: #fff; }
-#open { bottom: calc(146px + var(--sb)); background: #fff; color: #222; }
-#brand { position: fixed; left: 50%; bottom: calc(4px + var(--sb)); transform: translateX(-50%); font-size: 11px; color: #000; background: var(--y); border-radius: 8px; padding: 2px 8px; white-space: nowrap; pointer-events: none; }
+#act { bottom: calc(22px + var(--nh) + var(--sb)); background: var(--y); color: #222; }
+#car { bottom: calc(80px + var(--nh) + var(--sb)); background: var(--r); color: #fff; }
+#nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; display: none; background: rgba(16,17,21,.96); border-top: 1px solid #2c2d33; padding: 0 4px var(--sb); }
+#nav button { flex: 1; height: var(--nh); background: none; border: 0; color: #aab; font-size: 12px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; position: relative; padding: 0; }
+#nav button i { font-style: normal; font-size: 22px; line-height: 1; filter: grayscale(.6); opacity: .8; }
+#nav button.on { color: var(--y); } #nav button.on i { filter: none; opacity: 1; }
+#nav button.dot::after { content: ''; position: absolute; top: 8px; left: calc(50% + 10px); width: 9px; height: 9px; border-radius: 50%; background: var(--r); border: 2px solid #111; }
+@media (min-width: 601px) { #nav { left: 50%; right: auto; width: 480px; transform: translateX(-50%); border: 1px solid #2c2d33; border-bottom: 0; border-radius: 16px 16px 0 0; } }
 
-#panel { right: 8px; bottom: calc(8px + var(--sb)); width: min(380px, calc(100vw - 16px)); box-sizing: border-box; max-height: 78vh; overflow: auto; display: none; z-index: 5; font-size: 14px; padding: 12px 14px; }
+#panel { right: 8px; bottom: calc(8px + var(--nh) + var(--sb)); width: min(380px, calc(100vw - 16px)); box-sizing: border-box; max-height: calc(100% - 210px - var(--nh) - var(--st) - var(--sb)); overflow: auto; display: none; z-index: 5; font-size: 14px; padding: 12px 14px; }
 #ptabs button, .seg button { background: #333; color: #fff; border: 0; border-radius: 10px; padding: 10px 8px; font-size: 14px; font-weight: 600; }
 #ptabs { display: flex; gap: 6px; margin-bottom: 8px; } #ptabs button { flex: 1; }
 #ptabs button.on, .seg button.on { background: var(--y); color: #222; }
@@ -43,7 +46,7 @@ button { font-family: inherit; cursor: pointer; }
 .fun3 b { display: block; font-size: 20px; } .fun3 small, .tile small { color: #aab; font-size: 12px; display: block; }
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; } .tile { background: #1d1e23; border-radius: 10px; padding: 8px 10px; } .tile.wide { grid-column: 1 / -1; }
 .tile b { display: block; font-size: 18px; margin: 1px 0; } .tile span { color: #889; font-size: 12px; }
-@media (max-width: 600px) { #panel { left: 0; right: 0; bottom: 0; width: 100%; max-height: 74vh; border-left: 0; border-top: 3px solid var(--y); border-radius: 16px 16px 0 0; padding-bottom: calc(12px + var(--sb)); } }
+@media (max-width: 600px) { #panel { left: 0; right: 0; bottom: calc(var(--nh) + var(--sb)); width: 100%; max-height: calc(100% - 64px - var(--nh) - var(--st) - var(--sb)); border-left: 0; border-top: 3px solid var(--y); border-radius: 16px 16px 0 0; } }
 .row { display: flex; gap: 8px; margin-top: 10px; } .row > * { flex: 1; }
 .b1, .b2 { border: 0; border-radius: 10px; padding: 11px 12px; font-size: 14px; font-weight: 700; }
 .b1 { background: var(--y); color: #222; } .b2 { background: #3a3a3a; color: #fff; }

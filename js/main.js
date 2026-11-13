@@ -198,8 +198,30 @@ function showProfile() {
     <b>Мансап</b>${LEVELS.map((l, i) => `<div class="${i <= L ? 'good' : 'dim'}">${i <= L ? '✓' : '🔒'} ${l.n} <span class="dim">— ${l.xp} XP. ${l.open}</span></div>`).join('')}
     <b>Кейстер</b>${CASES.map(c => { const st = Gm.caseState(c.id); return `<div>${defOf(c.id).e} ${c.name} — ${st === 'lock' ? `<span class="dim">🔒 ${LEVELS[c.lvl].n}</span>` : st === 'run' ? 'жүріп жатыр' : stars(Gm.rec(c.id).stars)}</div>`; }).join('')}
     <b>Жетістіктер (${ACH.filter(a => g().ach[a[0]]).length}/${ACH.length})</b>${ACH.map(a => `<div class="${g().ach[a[0]] ? '' : 'dim'}">${g().ach[a[0]] ? a[1] : '▫️'} <b>${a[2]}</b> — ${a[3]}</div>`).join('')}
-    <div class="row"><button class="lnk" data-a="reset">Ойынды қайта бастау</button><button class="b1" data-a="ok">Жабу</button></div>`,
-  { ok: closeModal, reset: () => confirmBox('Бүкіл прогресс өшеді. Қайта бастайсың ба?', () => { Gm.reset(); closePanel(); begin(); }, 'Иә, өшір') });
+    <div class="row"><button class="b2" data-a="glo">📖 Глоссарий</button><button class="b1" data-a="ok">Жабу</button></div>
+    <div class="row"><button class="lnk" data-a="reset">Ойынды қайта бастау</button></div><p class="dim" style="text-align:center">BAIPKET CITY · Ойна. Үйрен. Бизнесті дамыт.</p>`,
+  { ok: closeModal, glo: showGlos, reset: () => confirmBox('Бүкіл прогресс өшеді. Қайта бастайсың ба?', () => { Gm.reset(); closePanel(); begin(); }, 'Иә, өшір') });
+}
+// ---------- Төменгі навигация: Қала / Жұмыс / Статистика / Профиль ----------
+function goTab(t) {
+  if (t === 'city') return closePanel();
+  if (t === 'work') return Gm.active() ? openPanel() : (closePanel(), showWork());
+  closePanel(); t === 'stat' ? showStats() : showProfile();
+}
+function showWork() {
+  const lbl = (st, c) => st === 'open' ? (Gm.rec(c.id).tries ? 'қайта өтуге болады' : '<span class="good">Жаңа тапсырыс</span>') : st === 'run' ? 'жүріп жатыр' : '';
+  modal(`<h2>💼 Жұмыс</h2><p class="lvl">▸ ${Gm.objective()}</p><b>Тапсырыстар</b>` +
+    CASES.map(c => { const st = Gm.caseState(c.id); return `<div>${defOf(c.id).e} ${c.name} — ${st === 'lock' ? `<span class="dim">🔒 ${LEVELS[c.lvl].n}</span>` : st === 'done' ? stars(Gm.rec(c.id).stars) : lbl(st, c)}</div>`; }).join('') +
+    `<p class="dim">Тапсырыс алу үшін қаладағы бизнеске бар (картадағы сары белгі).</p><button class="b1" data-a="ok">Қалаға оралу</button>`, { ok: closeModal });
+}
+function showStats() {
+  const s = g(), L = Gm.level(), nx = LEVELS[L + 1], done = CASES.filter(c => Gm.caseState(c.id) === 'done').length,
+    st = CASES.reduce((a, c) => a + (Gm.rec(c.id).stars || 0), 0), ach = ACH.filter(a => s.ach[a[0]]).length,
+    tile = (n, v, cap) => `<div class="tile"><small>${n}</small><b>${v}</b><span>${cap}</span></div>`;
+  modal(`<h2>📈 Статистика</h2><div class="tiles">${tile('Ақша', fmt(s.money), 'сенің қалтаңда') + tile('Тәжірибе', s.xp + ' XP', nx ? `келесі деңгейге ${nx.xp - s.xp} XP` : 'ең жоғары деңгей') +
+    tile('Кейстер', `${done}/${CASES.length}`, 'аяқталған') + tile('Жұлдыз', `${st}/${CASES.length * 3}`, 'барлық кейстерде')}<div class="tile wide"><small>Жетістіктер</small><b>${ach}/${ACH.length}</b><span>толығы Профильде</span></div></div>` +
+    (Gm.active() ? '<button class="b2" data-a="run" style="display:block;width:100%;margin-top:10px">📊 Науқанның күндік көрсеткіштері</button>' : '<p class="dim">Науқан көрсеткіштері (лид, конверсия, CPL, ROI) кейс жүріп жатқанда осында шығады.</p>') +
+    '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal, run: () => { closeModal(); panelSec = 'res'; openPanel(); } });
 }
 const showGlos = () => modal('<h2>📖 Глоссарий</h2>' + GLOS.map(([a, b]) => `<div><b>${a}</b> — ${b}</div>`).join('') + '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal });
 
@@ -208,14 +230,18 @@ const mapCtx = $('map').getContext('2d'), COL = { lock: '#777', open: '#FFD400',
 function drawHud() {
   const s = g(), L = Gm.level(), nx = LEVELS[L + 1], lo = LEVELS[L].xp, D = DIST[distAt(pos().x, pos().z)];
   $('hud').innerHTML = `💰 <b>${fmt(s.money)}</b> · ⭐ ${LEVELS[L].n}<div class="bar"><i style="width:${nx ? (s.xp - lo) / (nx.xp - lo) * 100 : 100}%"></i></div>` +
-    `<span class="dim">📍 ${D.n}${Gm.active() ? ` · Күн ${s.day}${paused ? ' ⏸' : ''}` : ''}</span><br>🎯 ${Gm.objective()}` +
+    `<span class="dim">📍 ${D.n}${Gm.active() ? ` · Күн ${s.day}${paused ? ' ⏸' : ''}` : ''}</span>` +
     (Gm.active() ? `<div class="bar thin"><i style="width:${s.t / DAY * 100}%"></i></div>` : '');
   const d = nearLot(), near = d && !W.inCar && !modalOn && started;
   $('act').style.display = near ? 'block' : 'none';
   if (near) { const st = d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id);
     $('act').textContent = st === 'lock' ? `🔒 ${d.n}` : st === 'run' || st === 'own' ? `${d.e} Басқару${mobile ? '' : ' (E)'}` : st === 'sale' ? `${d.e} Сатып алу` : st === 'done' ? `${d.e} Қайта өту` : `${d.e} Иесімен сөйлесу${mobile ? '' : ' (E)'}`; }
   $('car').style.display = nearCar() && !modalOn ? 'block' : 'none'; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';
-  $('open').style.display = Gm.active() && !panelOpen() && !modalOn ? 'block' : 'none';
+  const city = started && !modalOn && !panelOpen(), obj = Gm.objective();
+  $('next').style.display = city ? 'block' : 'none'; if ($('next').dataset.t !== obj) { $('next').dataset.t = obj; $('next').textContent = '▸ ' + obj; }
+  $('nav').style.display = started ? 'flex' : 'none';
+  const dot = { work: !Gm.active() && (CASES.some(c => Gm.caseState(c.id) === 'open') || Gm.fitState() === 'sale') };
+  for (const b of $('nav').children) { b.classList.toggle('on', b.dataset.t === (panelOpen() ? 'work' : 'city')); b.classList.toggle('dot', !!dot[b.dataset.t]); }
   const k = 104 / 200, q = v => (v + 100) * k; mapCtx.clearRect(0, 0, 104, 104);
   for (const d of DEFS) { mapCtx.fillStyle = COL[d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id)]; mapCtx.fillRect(q(d.x) - 4, q(d.z) - 4, 8, 8); }
   mapCtx.fillStyle = '#e53935'; mapCtx.fillRect(q(carPos().x) - 2, q(carPos().z) - 2, 4, 4);
@@ -234,7 +260,8 @@ function joyMove(e) { const r = stick.getBoundingClientRect(); let x = (e.client
 stick.onpointerdown = e => { stick.setPointerCapture(e.pointerId); joyMove(e); };
 stick.onpointermove = e => { if (stick.hasPointerCapture(e.pointerId)) joyMove(e); };
 stick.onpointerup = stick.onpointercancel = () => { W.joy.x = W.joy.y = 0; knob.style.transform = ''; };
-$('act').onclick = action; $('car').onclick = car; $('open').onclick = () => openPanel(); $('glo').onclick = showGlos; $('me').onclick = showProfile; $('x').onclick = closePanel;
+$('act').onclick = action; $('car').onclick = car; $('x').onclick = closePanel;
+$('nav').onclick = e => { const b = e.target.closest('button'); if (b && started && !modalOn) goTab(b.dataset.t); };
 
 // ---------- Іске қосу ----------
 initWorld(); Gm.load(); refreshLots(); showStart(); $('loading').remove(); window.__started = true;

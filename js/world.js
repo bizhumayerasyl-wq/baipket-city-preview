@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { PITCH, DIST, DEFS, distAt, DAY } from './data.js';
 import { makeTextures, TX, batcher, roadMarkings, streetProps, buildCoffee } from './street.js';
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js';
+import { LANDMARKS, buildLandmark, updateLandmarks } from './landmarks.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const W = { ang: Math.PI, speed: 0, inCar: false, joy: { x: 0, y: 0 }, keys: {} };
@@ -24,7 +25,7 @@ function label(text, bg, fg) {
 export function setLabel(id, text, bg = '#fff8e1', fg = '#3a2a10') {
   const L = lots[id]; if (L.text === text) return; L.text = text;
   if (L.sprite) { L.grp.remove(L.sprite); L.sprite.material.map.dispose(); L.sprite.material.dispose(); }
-  L.sprite = label(text, bg, fg); L.sprite.position.y = 8; L.grp.add(L.sprite);
+  L.sprite = label(text, bg, fg); L.sprite.position.y = (L.top || 5) + 3.2; L.grp.add(L.sprite);   // ғимараттың биіктігіне қарай
 }
 // Бірнеше пішінді түсімен бірге бір геометрияға біріктіру (бір draw call). parts: [геометрия, түс, x, y, z, [sx, sy, sz]]
 const mergeCache = {};
@@ -154,7 +155,9 @@ export function initWorld() {
       if (d.id === 'coffee') buildCoffee(grp, add);
       else { add(new THREE.BoxGeometry(11, 4.4, 11), mat(d.col), 0, 2.2, 0, grp); add(new THREE.BoxGeometry(12.4, .6, 12.4), mat(0xffd400), 0, 4.7, 0, grp);
         add(new THREE.BoxGeometry(3, 2.6, .3), mat(0xcfe8ff), 0, 1.3, 5.5, grp); }
-      lots[d.id] = { grp }; colliders.push({ x, z, r: 6 }); continue; }
+      lots[d.id] = { grp, top: d.id === 'coffee' ? 7.7 : 5 }; colliders.push({ x, z, r: 6 }); continue; }
+    const lm = LANDMARKS[`${i},${j}`];                                                       // басты ғимараттар (бас кеңсе, Event Center, Mentor Center)
+    if (lm) { const grp = new THREE.Group(); grp.position.set(x, 0, z); scene.add(grp); buildLandmark(lm, grp); colliders.push({ x, z, r: 7 }); continue; }
     // Ғимарат: терезелі қасбет (4 бүйір), шатыр бөлек, бірінші қабатта дүкен белдеуі, үстінде карниз
     const D = DIST[distAt(x, z)], h = D.h[0] + rnd(i, j, 1) * (D.h[1] - D.h[0]), t = new THREE.CanvasTexture(TX.facades[(i * 3 + j + 30) % 3]);
     t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, Math.max(.5, (h - 3.6) / 3.2 / 4)); t.offset.y = -3.6 / 3.2 / 4; t.anisotropy = 4;
@@ -216,10 +219,11 @@ function moveNpcs(dt) { for (let i = npcs.length - 1; i >= 0; i--) { const n = n
 export function frame(dt, frozen) {
   if (!frozen) { move(dt); moveNpcs(dt); moveTraffic(dt); }
   if (hero.ready) heroAnim(frozen || W.inCar ? 0 : W.speed, dt); else animate(player, frozen || W.inCar ? 0 : W.speed, dt);
-  const p = pos(); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
+  const p = pos(); updateLandmarks(p); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
   const dist = W.inCar ? 15 : 11, hgt = W.inCar ? 7.5 : 6.5;
   cam.position.lerp(look.set(p.x - Math.sin(W.ang) * dist, hgt, p.z - Math.cos(W.ang) * dist), 1 - Math.pow(.001, dt));
   cam.lookAt(p.x + Math.sin(W.ang) * 4, 2, p.z + Math.cos(W.ang) * 4);
+  if (W.shot) { cam.position.set(...W.shot[0]); cam.lookAt(...W.shot[1]); }   // тек әзірлеу кезіндегі скриншотқа (localhost)
   renderer.render(scene, cam);
 }
 // Бейімделетін сапа: 2 секундтағы орташа кадр 1/40 с-тан ұзақ болса — ажыратымдылық төмендейді, 1/55 с-тан қысқа болса — қайта өседі (шегі — бастапқы мән)

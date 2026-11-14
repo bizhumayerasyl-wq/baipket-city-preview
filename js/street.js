@@ -45,7 +45,7 @@ export function makeTextures() {
   TX.awning = tex(cv(128, 64, (x, w, h) => { for (let i = 0; i < 8; i++) { x.fillStyle = i % 2 ? '#f3ead7' : '#1f5a45'; x.fillRect(i * 16, 0, 16, h); }
     x.fillStyle = 'rgba(0,0,0,.18)'; x.fillRect(0, h - 8, w, 8); }), 2, 1);
   TX.sign = tex(cv(512, 96, (x, w, h) => { x.fillStyle = '#16402f'; x.fillRect(0, 0, w, h); x.strokeStyle = '#c9a85b'; x.lineWidth = 4; x.strokeRect(6, 6, w - 12, h - 12);
-    x.fillStyle = '#f3ead7'; x.font = 'bold 54px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('ТАҢ · COFFEE', w / 2, h / 2 + 3); }));
+    x.fillStyle = '#f3ead7'; x.font = 'bold 54px Georgia, serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('COFFEE', w / 2, h / 2 + 3); }));
   TX.menu = tex(cv(256, 160, (x, w, h) => { x.fillStyle = '#111417'; x.fillRect(0, 0, w, h); x.fillStyle = '#efe6d2'; x.font = 'bold 20px monospace';
     [['ЭСПРЕССО', '700'], ['КАПУЧИНО', '1100'], ['ЛАТТЕ', '1200'], ['ШАЙ', '500'], ['КРУАССАН', '900']].forEach(([a, b], i) => { x.fillText(a, 16, 30 + i * 28); x.fillText(b, w - 70, 30 + i * 28); }); }));
 }
@@ -93,7 +93,7 @@ export function streetProps(bt, lamps) {
   const onWalk = v => !ROADS.some(r => Math.abs(v - r) < 5);                     // қиылыстың үстінде емес
   for (let x = -78; x <= 78; x += 6) { if (!onWalk(x)) continue; if (x % 12 === 0) lamp(x, -16.6, 0); else lamp(x, -7.4, Math.PI); }
   for (let z = -78; z <= 78; z += 6) { if (!onWalk(z)) continue; if (z % 12 === 0) lamp(-16.6, z, Math.PI / 2); else lamp(-7.4, z, -Math.PI / 2); }
-  for (const x of [-50, -44, -30.6, -17.6]) planter(x, -17.4, x);
+  for (const x of [-54.6, -41.4, -30.6, -17.6]) planter(x, -17.4, x);
   for (const x of [-52, -46, -2, 4]) bench(x, -8.6, Math.PI);
   for (const x of [-54.5, -53.3, -42.7, -41.5]) bt.put(G.bollard, metal, x, .64, -16.4);
 }
@@ -103,7 +103,7 @@ export function streetProps(bt, lamps) {
 const mkey = m => [m.type, m.color && m.color.getHex(), m.map && m.map.uuid, m.transparent, m.side, m.flatShading].join('|');
 export function bakeStatic(root) {
   root.updateMatrixWorld(true); const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), groups = new Map(), drop = [];
-  root.traverse(o => { if (!o.isMesh || Array.isArray(o.material) || o === root) return;
+  root.traverse(o => { if (!o.isMesh || o.isInstancedMesh || Array.isArray(o.material) || o === root) return;
     const k = mkey(o.material) + '|' + o.castShadow; let g = groups.get(k); if (!g) groups.set(k, g = { mat: o.material, cast: o.castShadow, list: [] });
     g.list.push(o.geometry.clone().applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld))); drop.push(o); });
   for (const o of drop) o.parent.remove(o);
@@ -118,7 +118,7 @@ export function bakeStatic(root) {
 // ---------- «Таң» кофейнясы: кірпіш ғимарат, витрина, маңдайша, күнқағар, сыртқы үстелдер және ішкі бөлме ----------
 // grp — лоттың тобы (ортасы ғимараттың ортасы), алды +z жақта (көшеге қарайды)
 export function buildCoffee(grp, add) {
-  const L = o => new THREE.MeshLambertMaterial(o), Bm = o => new THREE.MeshBasicMaterial(o), box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+  const L = o => new THREE.MeshLambertMaterial(o), Bm = o => new THREE.MeshBasicMaterial({ toneMapped: false, ...o }), box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
   const brick = L({ map: TX.brick }), frame = L({ color: 0x1b1f24 }), trim = L({ color: 0xe9e2d3 }), brand = L({ color: 0xffd400 });
   const glass = new THREE.MeshPhongMaterial({ color: 0xa9c4d3, transparent: true, opacity: .22, shininess: 120, specular: 0xffffff, depthWrite: false });
   // Жоғарғы қабат пен шатыр (бірінші қабат ашық — ішкі бөлме көрінеді)

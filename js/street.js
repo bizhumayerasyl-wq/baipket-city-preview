@@ -137,30 +137,8 @@ export function buildCoffee(grp, add) {
   // Маңдайша (өзі жарқырайды — MeshBasic) және күнқағар
   add(box(7.2, 1.05, .2), frame, 0, 4.55, 5.6, grp); add(new THREE.PlaneGeometry(7, .9), Bm({ map: TX.sign }), 0, 4.55, 5.71, grp);
   const aw = add(new THREE.PlaneGeometry(9.6, 1.3), L({ map: TX.awning, side: THREE.DoubleSide }), 0, 3.82, 6.05, grp); aw.rotation.x = -1.15;
-  // Ішкі бөлме — жарығы текстура мен түске «пісірілген», жарық көзі жоқ (телефонда арзан)
-  const inner = new THREE.Group(); grp.add(inner);
-  const bAdd = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x, y, z); inner.add(o); return o; };
-  const floor = bAdd(new THREE.PlaneGeometry(10.4, 10.4), Bm({ map: TX.floor }), 0, .26, 0); floor.rotation.x = -Math.PI / 2;
-  const ceil = bAdd(new THREE.PlaneGeometry(10.4, 10.4), Bm({ color: 0x2a2622 }), 0, 3.9, 0); ceil.rotation.x = Math.PI / 2;
-  bAdd(new THREE.PlaneGeometry(10.4, 3.7), Bm({ map: TX.wallTile }), 0, 2.1, -5.18);
-  for (const s of [-1, 1]) { const w = bAdd(new THREE.PlaneGeometry(10.4, 3.7), Bm({ map: TX.wallTile }), s * 5.18, 2.1, 0); w.rotation.y = -s * Math.PI / 2; }
-  // Сатушы сөресі: ақ панельдер, ағаш үстел беті, жарықтандырылған витрина
-  bAdd(box(7.4, 1.1, 1), Bm({ color: 0xc9ccd0 }), -.6, .81, -1.2); bAdd(box(7.6, .08, 1.15), Bm({ color: 0x7a4a2a }), -.6, 1.4, -1.2);
-  bAdd(box(7.2, .26, .05), Bm({ color: 0xffd79a }), -.6, 1.15, -.68);
-  bAdd(box(1, .62, .55), Bm({ color: 0xd8dde2 }), -3, 1.75, -1.35); bAdd(box(1.02, .12, .57), Bm({ color: 0xc66a2c }), -3, 2.1, -1.35);   // кофе машинасы
-  bAdd(box(.5, .4, .4), Bm({ color: 0x2b2f35 }), 1.6, 1.64, -1.3);                                                                          // касса
-  // Нан сөрелері
-  const shelf = Bm({ color: 0x6d4527 }), bread = Bm({ color: 0xc58a4a }), bun = new THREE.CapsuleGeometry(.09, .22, 3, 6);
-  for (const y of [1.6, 2.15, 2.7]) { bAdd(box(3.2, .06, .5), shelf, 2.2, y, -4.85); for (let i = 0; i < 9; i++) { const b = bAdd(bun, bread, .9 + i * .33, y + .12, -4.8); b.rotation.z = Math.PI / 2; } }
-  const menu = bAdd(new THREE.PlaneGeometry(2.6, 1.6), Bm({ map: TX.menu }), -2.4, 2.7, -5.15);
-  // Ілулі шамдар: күңгірт жасыл қалпақ, жылы шам
-  const shade = Bm({ color: 0x1f3b30 }), light = Bm({ color: 0xfff0c8 }), cone = new THREE.ConeGeometry(.42, .42, 16, 1, true), disc = new THREE.CircleGeometry(.36, 16);
-  for (const x of [-3.5, -1.2, 1.1, 3.4]) { bAdd(new THREE.CylinderGeometry(.015, .015, .9), shade, x, 3.45, -1); bAdd(cone, shade, x, 2.85, -1);
-    const d = bAdd(disc, light, x, 2.66, -1); d.rotation.x = Math.PI / 2; }
-  // Ішкі үстелдер мен орындықтар
-  const tTop = new THREE.CylinderGeometry(.42, .42, .05, 18), tLeg = new THREE.CylinderGeometry(.04, .04, .75, 6), stool = new THREE.CylinderGeometry(.2, .2, .45, 12);
-  for (const [x, z] of [[-3.4, 2.9], [0, 3.3], [3.3, 2.7]]) { bAdd(tTop, Bm({ color: 0xe8e2d6 }), x, 1.03, z); bAdd(tLeg, Bm({ color: 0x1b1f24 }), x, .64, z);
-    for (const o of [-.7, .7]) bAdd(stool, Bm({ color: 0x3a2c22 }), x + o, .5, z); }
+  // Ішкі бөлме енді бөлек: js/coffee.js (жалқау жүктеледі, NPC-лері бар)
+  const tTop = new THREE.CylinderGeometry(.42, .42, .05, 18), tLeg = new THREE.CylinderGeometry(.04, .04, .75, 6);
   // Сыртқы үстелдер, мәзір тақтасы, гүл кашполары
   const out = L({ color: 0x1b1f24 }), oTop = L({ color: 0xe9e2d3 });
   for (const x of [-3.4, 2.2]) { add(tTop, oTop, x, 1.0, 7.1, grp); add(tLeg, out, x, .62, 7.1, grp);
@@ -168,5 +146,4 @@ export function buildCoffee(grp, add) {
   const board = add(box(.7, 1, .06), out, -.6, .74, 7.5, grp); board.rotation.x = -.18;
   const bf = add(new THREE.PlaneGeometry(.62, .9), Bm({ map: TX.menu }), -.6, .745, 7.535, grp); bf.rotation.x = -.18;
   bakeStatic(grp);
-  return inner;
 }

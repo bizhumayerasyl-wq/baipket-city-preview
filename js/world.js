@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { PITCH, DIST, DEFS, distAt, DAY } from './data.js';
 import { makeTextures, TX, batcher, roadMarkings, streetProps, buildCoffee } from './street.js';
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js';
-import { LANDMARKS, buildLandmark, updateLandmarks } from './landmarks.js';
+import { LANDMARKS, buildLandmark, updateLandmarks, registerLazy, tickLandmarks, landmarkEvent } from './landmarks.js';
+import { coffeeDef, setRenderer } from './coffee.js';
 import { SHOPS } from './shops.js';
 import { INTERIORS, freeInside, doorOut, doorIn } from './interiors.js';
 
@@ -125,7 +126,7 @@ export function initWorld() {
   cam = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 1.2, 400);   // камераға тым жақын заттар кесіледі
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   maxPR = Math.min(devicePixelRatio, mobile ? 1.5 : 2); renderer.setPixelRatio(maxPR); renderer.shadowMap.enabled = !mobile; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  setRenderer(renderer); renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   document.body.prepend(renderer.domElement);
   const resize = () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); };
   addEventListener('resize', resize); resize();
@@ -154,7 +155,7 @@ export function initWorld() {
     bt.put(slab, paveM, x, .12, z, 0, 1, 1, 1, false); bt.put(curb, curbM, x, .1, z, 0, 1, 1, 1, false);
     const d = DEFS.find(d => d.i === i && d.j === j);
     if (d) { const grp = new THREE.Group(); grp.position.set(x, 0, z); scene.add(grp);
-      if (d.id === 'coffee') buildCoffee(grp, add);
+      if (d.id === 'coffee') { buildCoffee(grp, add); registerLazy(coffeeDef, grp); }   // іші — js/coffee.js
       else if (SHOPS[d.id]) buildLandmark({ ...SHOPS[d.id], id: d.id }, grp);                  // киім, салон, оқу, қойма, фитнес: өз сырты, «жалқау» іші
       else { add(new THREE.BoxGeometry(11, 4.4, 11), mat(d.col), 0, 2.2, 0, grp); add(new THREE.BoxGeometry(12.4, .6, 12.4), mat(0xffd400), 0, 4.7, 0, grp);
         add(new THREE.BoxGeometry(3, 2.6, .3), mat(0xcfe8ff), 0, 1.3, 5.5, grp); }
@@ -185,13 +186,13 @@ export const nearDoor = () => { if (W.inside || W.inCar) return null; const p = 
   return Object.values(INTERIORS).find(I => { const d = doorOut(I); return Math.hypot(p.x - d.x, p.z - d.z) < 3; }) || null; };
 export function enterBuilding(I) {
   if (!I || W.inside || W.inCar) return false; updateLandmarks(player.position);                       // іші әлі жасалмаса, қазір жасалады
-  W.inside = I; const p = doorIn(I); player.position.set(p.x, 0, p.z); W.ang = Math.PI; W.speed = 0;
+  W.inside = I; landmarkEvent(I.id, 'enter'); const p = doorIn(I); player.position.set(p.x, 0, p.z); W.ang = Math.PI; W.speed = 0;
   cam.near = .3; cam.updateProjectionMatrix(); W.snap = true; return true;
 }
 // Сақталатын орын: іште болса — есіктің алды (жүктегенде кейіпкер ғимарат алдында пайда болады)
 export const savePos = () => W.inside ? doorOut(W.inside) : pos();
 export function exitBuilding() {
-  const I = W.inside; if (!I) return false; W.inside = null; const p = doorOut(I);
+  const I = W.inside; if (!I) return false; landmarkEvent(I.id, 'leave'); W.inside = null; const p = doorOut(I);
   player.position.set(p.x, 0, p.z); W.ang = 0; W.speed = 0; cam.near = 1.2; cam.updateProjectionMatrix(); W.snap = true; return true;
 }
 export const nearLot = () => DEFS.find(d => Math.hypot(pos().x - d.x, pos().z - d.z) < 14);
@@ -239,7 +240,7 @@ function moveNpcs(dt) { for (let i = npcs.length - 1; i >= 0; i--) { const n = n
 export function frame(dt, frozen) {
   if (!frozen) { move(dt); moveNpcs(dt); moveTraffic(dt); }
   if (hero.ready) heroAnim(frozen || W.inCar ? 0 : W.speed, dt); else animate(player, frozen || W.inCar ? 0 : W.speed, dt);
-  const p = pos(); updateLandmarks(p); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
+  const p = pos(); updateLandmarks(p); tickLandmarks(dt); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
   const I = W.inside, dist = I ? 5.2 : W.inCar ? 15 : 11, hgt = I ? I.cam : W.inCar ? 7.5 : 6.5;
   look.set(p.x - Math.sin(W.ang) * dist, hgt, p.z - Math.cos(W.ang) * dist);
   if (I) { look.x = clamp(look.x, I.x - I.hw + .2, I.x + I.hw - .2); look.z = clamp(look.z, I.z + I.z0 + .2, I.z + I.glass - .2); }   // камера бөлмеден шықпайды

@@ -166,10 +166,15 @@ const live = [];
 export const mats = () => ({ metal: L({ color: PAL.metal }), concrete: L({ color: PAL.concrete }), concreteDark: L({ color: 0x8d8a85 }) });
 // Кез келген ғимарат: сыртын салып біріктіреді, ішін «жалқау» тізімге қосады
 export function buildLandmark(def, grp) { def.ext(grp, mats()); bakeStatic(grp); live.push({ def, grp, inner: null }); }
+// Сырты бөлек салынған ғимараттың ішін «жалқау» тізімге қосу (мысалы, кофейня). def: { id, int(g), live?(g), tick?(dt, ctx), enter?(), leave?(), dispose?() }
+export const registerLazy = (def, grp) => live.push({ def, grp, inner: null });
+// Тірі бөліктер (NPC, бу, дыбыс) кадр сайын: тек іші жүктелген ғимараттарда
+export function tickLandmarks(dt, ctx) { for (const L of live) if (L.inner && L.def.tick) L.def.tick(dt, ctx); }
+export function landmarkEvent(id, ev) { const L = live.find(L => L.def.id === id); if (L && L.inner && L.def[ev]) L.def[ev](); }
 const IN = 45, OUT = 70;                                                                                     // жасалу және өшірілу қашықтығы (м)
 export function updateLandmarks(p) {
   for (const L of live) { const d = Math.hypot(p.x - L.grp.position.x, p.z - L.grp.position.z);
-    if (!L.inner && d < IN) { L.inner = new THREE.Group(); L.def.int(L.inner); bakeStatic(L.inner); L.grp.add(L.inner); }
-    else if (L.inner && d > OUT) { L.grp.remove(L.inner); L.inner.traverse(o => { if (o.geometry) o.geometry.dispose(); for (const m of [].concat(o.material || [])) { if (m.map) m.map.dispose(); m.dispose(); } }); L.inner = null; } }
+    if (!L.inner && d < IN) { L.inner = new THREE.Group(); L.def.int(L.inner); bakeStatic(L.inner); if (L.def.live) L.def.live(L.inner); L.grp.add(L.inner); }
+    else if (L.inner && d > OUT) { if (L.def.dispose) L.def.dispose(); L.grp.remove(L.inner); L.inner.traverse(o => { if (o.geometry) o.geometry.dispose(); for (const m of [].concat(o.material || [])) { if (m.map) m.map.dispose(); m.dispose(); } }); L.inner = null; } }
 }
 export const landmarkStats = () => live.map(L => [L.def.id, !!L.inner]);

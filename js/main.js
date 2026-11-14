@@ -2,7 +2,7 @@
 import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
-import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg } from './world.js';
+import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg, heroGesture, heroReady } from './world.js';
 
 const $ = id => document.getElementById(id);
 const num = n => Math.round(n).toLocaleString('ru-RU'), fmt = n => num(n) + ' ₸';
@@ -78,7 +78,7 @@ function action() {
   if (st === 'lock') return toast(`${c.name} әзірге саған сенбейді. Бұл тапсырыс «${LEVELS[c.lvl].n}» деңгейінде ашылады.`);
   if (st === 'run') return openPanel('case');
   if (g().run) return toast(`Алдымен ағымдағы кейсті аяқта: ${caseOf(g().run.id).name}.`);
-  wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz();
+  heroGesture('Interact'); wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz();
 }
 
 // ---------- Кейс шебері: бриф → диагноз → сегмент → позиция → оффер → іске қосу ----------
@@ -214,7 +214,7 @@ function showEvent() {
       <button class="b1" data-a="ok">Науқанды жалғастыру</button>`, { ok: () => { closeModal(); paused = false; renderPanel(); } }); } });
 }
 function showResult(r) {
-  const { c, s } = r, G = c.goal; refreshLots(); paused = false;
+  const { c, s } = r, G = c.goal; refreshLots(); paused = false; if (s.ok) heroGesture('Wave');
   modal(`<div class="dim">${c.name} · кейс қорытындысы</div><h2>${s.ok ? 'Мақсат орындалды' : 'Мақсатқа жетпедің'} ${stars(s.stars)}</h2>
     <table><tr><td>Көрсеткіш</td><td>${num(G.from)}${G.u} → <b class="${s.p >= 1 ? 'good' : 'bad'}">${num(s.val)}${G.u}</b> (мақсат ${num(G.to)}${G.u})</td></tr>
     ${c.must ? `<tr><td>Шарт</td><td class="${s.must ? 'good' : 'bad'}">${c.must.t}: ${s.must ? 'орындалды' : 'орындалмады'}</td></tr>` : ''}
@@ -316,4 +316,4 @@ startLoop(dt => {
   frame(dt, frozen);
   if (started && (hudT -= dt) <= 0) { hudT = .2; drawHud(); }
 });
-if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients, dbg };   // тек әзірлеу кезінде
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients, dbg, heroReady };   // тек әзірлеу кезінде

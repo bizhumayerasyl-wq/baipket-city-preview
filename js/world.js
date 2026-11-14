@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { PITCH, DIST, DEFS, distAt, DAY } from './data.js';
 import { makeTextures, TX, batcher, roadMarkings, streetProps, buildCoffee } from './street.js';
+import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const W = { ang: Math.PI, speed: 0, inCar: false, joy: { x: 0, y: 0 }, keys: {} };
@@ -62,6 +63,31 @@ function animate(p, speed, dt) {
   u.b.position.y = Math.abs(Math.cos(u.ph)) * .09 * u.amp + Math.sin(u.t * 2.2) * .012;
   u.b.rotation.x += ((speed > 0 ? .16 * s : 0) - u.b.rotation.x) * Math.min(1, dt * 8);
 }
+// ---------- Ойыншының 3D моделі (Quaternius «Business Man», CC0) ----------
+// Фонда жүктеледі: ойын бірден ашылады; жүктелмесе — процедуралық кейіпкер қалады. Анимация: Idle / Walk / Run жылдамдыққа қарай, ауысуы тегіс (0,2 с).
+const hero = { mixer: null, act: {}, cur: null, ready: false, once: false };
+function loadHero() {
+  new GLTFLoader().load('assets/models/businessman.glb', g => {
+    const m = g.scene; m.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(m, true), s = 2.35 / (box.max.y - box.min.y);   // қаңқасы бар нақты өлшем
+    m.scale.setScalar(s); m.position.y = -box.min.y * s;
+    m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; if (o.material.name === 'Suit') o.material.color.setHex(0x2c3e5c); } });   // костюм асфальтпен қосылып кетпеуі үшін — қою көк
+    player.userData.b.visible = false; player.add(m);
+    hero.mixer = new THREE.AnimationMixer(m); for (const c of g.animations) hero.act[c.name] = hero.mixer.clipAction(c);
+    hero.mixer.addEventListener('finished', () => { hero.once = false; });
+    hero.cur = hero.act.Idle; hero.cur.play(); hero.ready = true;
+  }, undefined, e => console.warn('Кейіпкер моделі жүктелмеді — қарапайым кейіпкер қалады.', e));
+}
+function heroAnim(speed, dt) {
+  const a = Math.abs(speed), name = hero.once ? null : a < .4 ? 'Idle' : a < 7.5 ? 'Walk' : 'Run', next = name && hero.act[name];
+  if (next && next !== hero.cur) { next.reset().fadeIn(.2).play(); hero.cur.fadeOut(.2); hero.cur = next; }
+  if (name === 'Walk') next.timeScale = (speed < 0 ? -1 : 1) * Math.max(.7, a / 4.2);   // артқа жүргенде анимация кері ойналады
+  if (name === 'Run') next.timeScale = Math.max(.8, a / 10);
+  hero.mixer.update(dt);
+}
+// Бір реттік қимыл: иесімен сөйлескенде — Interact, кейс сәтті біткенде — Wave
+export function heroGesture(n) { const a = hero.act[n]; if (!hero.ready || !a) return;
+  a.reset(); a.setLoop(THREE.LoopOnce, 1); a.timeScale = 1; a.fadeIn(.15).play(); hero.cur.fadeOut(.15); hero.cur = a; hero.once = true; }
+export const heroReady = () => hero.ready;
 const turnTo = (o, a, dt) => { let d = a - o.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); o.rotation.y += d * Math.min(1, dt * 10); };
 function makeCar(color) {
   // Бүкіл көлік бір пішін (бір draw call): шанақ, әйнекті кабина, дөңгелектер, алдыңғы және артқы шамдар, номер
@@ -138,7 +164,7 @@ export function initWorld() {
     colliders.push({ x, z, r: 7 });
   }
   roadMarkings(bt); streetProps(bt, {}); bt.flush();
-  player = person(0x2f6fed, 0); player.position.set(-10, 0, -12);
+  player = person(0x2f6fed, 0); player.position.set(-10, 0, -12); loadHero();
   myCar = makeCar(0xe53935); myCar.position.set(-14, 0, -4);
   [-60, -36, -12, 12, 36, 60].forEach((road, n) => { for (const dir of [1, -1]) { if ((n + dir) % 3 === 0) continue;
     traffic.push({ m: makeCar([0x1e88e5, 0xfdd835, 0x8e24aa, 0xfafafa, 0x43a047][traffic.length % 5]), ax: n % 2, road, dir, p: (n * 37 * dir) % 90 }); } });
@@ -189,7 +215,7 @@ function moveNpcs(dt) { for (let i = npcs.length - 1; i >= 0; i--) { const n = n
 
 export function frame(dt, frozen) {
   if (!frozen) { move(dt); moveNpcs(dt); moveTraffic(dt); }
-  animate(player, frozen || W.inCar ? 0 : W.speed, dt);
+  if (hero.ready) heroAnim(frozen || W.inCar ? 0 : W.speed, dt); else animate(player, frozen || W.inCar ? 0 : W.speed, dt);
   const p = pos(); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
   const dist = W.inCar ? 15 : 11, hgt = W.inCar ? 7.5 : 6.5;
   cam.position.lerp(look.set(p.x - Math.sin(W.ang) * dist, hgt, p.z - Math.cos(W.ang) * dist), 1 - Math.pow(.001, dt));

@@ -5,9 +5,10 @@ import { makeTextures, TX, batcher, roadMarkings, streetProps, buildCoffee } fro
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js';
 import { LANDMARKS, buildLandmark, updateLandmarks } from './landmarks.js';
 import { SHOPS } from './shops.js';
+import { INTERIORS, freeInside, doorOut, doorIn } from './interiors.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-export const W = { ang: Math.PI, speed: 0, inCar: false, joy: { x: 0, y: 0 }, keys: {} };
+export const W = { ang: Math.PI, speed: 0, inCar: false, inside: null, joy: { x: 0, y: 0 }, keys: {} };   // inside — ойыншы тұрған ғимарат (interiors.js)
 export const mobile = matchMedia('(pointer:coarse)').matches;
 let scene, cam, renderer, player, myCar, sun, maxPR = 1;
 const SKIN = [0xf2c9a0, 0xe0ac7e, 0xc68a5e], HAIR = [0x2b1d14, 0x4a3020, 0x111111, 0x6b4a2b];
@@ -177,10 +178,25 @@ export function initWorld() {
 
 export const pos = () => (W.inCar ? myCar : player).position;
 export const carPos = () => myCar.position;
-export const nearCar = () => W.inCar || player.position.distanceTo(myCar.position) < 6;
+export const nearCar = () => W.inCar || (!W.inside && player.position.distanceTo(myCar.position) < 6);
+// ---------- Ғимаратқа кіру және шығу ----------
+// Есіктің жанында (3 м) тұрса — сол ғимарат; іште болса — null
+export const nearDoor = () => { if (W.inside || W.inCar) return null; const p = player.position;
+  return Object.values(INTERIORS).find(I => { const d = doorOut(I); return Math.hypot(p.x - d.x, p.z - d.z) < 3; }) || null; };
+export function enterBuilding(I) {
+  if (!I || W.inside || W.inCar) return false; updateLandmarks(player.position);                       // іші әлі жасалмаса, қазір жасалады
+  W.inside = I; const p = doorIn(I); player.position.set(p.x, 0, p.z); W.ang = Math.PI; W.speed = 0;
+  cam.near = .3; cam.updateProjectionMatrix(); W.snap = true; return true;
+}
+// Сақталатын орын: іште болса — есіктің алды (жүктегенде кейіпкер ғимарат алдында пайда болады)
+export const savePos = () => W.inside ? doorOut(W.inside) : pos();
+export function exitBuilding() {
+  const I = W.inside; if (!I) return false; W.inside = null; const p = doorOut(I);
+  player.position.set(p.x, 0, p.z); W.ang = 0; W.speed = 0; cam.near = 1.2; cam.updateProjectionMatrix(); W.snap = true; return true;
+}
 export const nearLot = () => DEFS.find(d => Math.hypot(pos().x - d.x, pos().z - d.z) < 14);
 export function place(x, z) { if (!W.inCar && free(x, z)) player.position.set(x, 0, z); }
-const free = (x, z) => Math.abs(x) < 94 && Math.abs(z) < 94 && !colliders.some(c => Math.abs(x - c.x) < c.r && Math.abs(z - c.z) < c.r);
+const free = (x, z) => W.inside ? freeInside(W.inside, x - W.inside.x, z - W.inside.z) : Math.abs(x) < 94 && Math.abs(z) < 94 && !colliders.some(c => Math.abs(x - c.x) < c.r && Math.abs(z - c.z) < c.r);
 
 // Көлікке отыру/түсу. Түсетін бос орын болмаса false қайтарады.
 export function toggleCar() {
@@ -197,11 +213,13 @@ function move(dt) {
   const turn = clamp((k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0) + W.joy.x, -1, 1);
   const o = W.inCar ? myCar : player;
   if (W.inCar) { W.speed += fwd * 26 * dt; W.speed *= 1 - 1.2 * dt; W.speed = clamp(W.speed, -10, 32); W.ang -= turn * 1.9 * dt * Math.sign(W.speed) * Math.min(1, Math.abs(W.speed) / 7); }
-  else { W.speed = fwd * (fwd < 0 ? 5 : 11); W.ang -= turn * 2.4 * dt; }
+  else { W.speed = fwd * (fwd < 0 ? 5 : 11) * (W.inside ? .45 : 1); W.ang -= turn * 2.4 * dt; }   // іште баяу жүреді
   const nx = o.position.x + Math.sin(W.ang) * W.speed * dt, nz = o.position.z + Math.cos(W.ang) * W.speed * dt;
   let hit = true; if (free(nx, o.position.z)) { o.position.x = nx; hit = false; } if (free(o.position.x, nz)) { o.position.z = nz; hit = false; }
   if (hit && W.inCar) W.speed *= -.3;
   o.rotation.y = W.ang;
+  // Іште есікке қарай жүріп барса — сыртқа шығады
+  const I = W.inside; if (I && W.speed > 0 && Math.cos(W.ang) > .3 && o.position.z - I.z > I.z1 - .5 && Math.abs(o.position.x - I.x - I.door) < 1.3) exitBuilding();
 }
 function moveTraffic(dt) { const p = pos(); for (const c of traffic) {
   if (Math.hypot(c.m.position.x - p.x, c.m.position.z - p.z) > 5.5) c.p += c.dir * 13 * dt;   // ойыншының алдында тоқтайды
@@ -222,9 +240,11 @@ export function frame(dt, frozen) {
   if (!frozen) { move(dt); moveNpcs(dt); moveTraffic(dt); }
   if (hero.ready) heroAnim(frozen || W.inCar ? 0 : W.speed, dt); else animate(player, frozen || W.inCar ? 0 : W.speed, dt);
   const p = pos(); updateLandmarks(p); sun.position.set(p.x + 30, 45, p.z + 20); sun.target.position.set(p.x, 0, p.z); G.sky.position.set(p.x, 0, p.z);
-  const dist = W.inCar ? 15 : 11, hgt = W.inCar ? 7.5 : 6.5;
-  cam.position.lerp(look.set(p.x - Math.sin(W.ang) * dist, hgt, p.z - Math.cos(W.ang) * dist), 1 - Math.pow(.001, dt));
-  cam.lookAt(p.x + Math.sin(W.ang) * 4, 2, p.z + Math.cos(W.ang) * 4);
+  const I = W.inside, dist = I ? 5.2 : W.inCar ? 15 : 11, hgt = I ? I.cam : W.inCar ? 7.5 : 6.5;
+  look.set(p.x - Math.sin(W.ang) * dist, hgt, p.z - Math.cos(W.ang) * dist);
+  if (I) { look.x = clamp(look.x, I.x - I.hw + .2, I.x + I.hw - .2); look.z = clamp(look.z, I.z + I.z0 + .2, I.z + I.glass - .2); }   // камера бөлмеден шықпайды
+  if (W.snap) { cam.position.copy(look); W.snap = false; } else cam.position.lerp(look, 1 - Math.pow(.001, dt));
+  cam.lookAt(p.x + Math.sin(W.ang) * (I ? 3 : 4), I ? 1.4 : 2, p.z + Math.cos(W.ang) * (I ? 3 : 4));
   if (W.shot) { cam.position.set(...W.shot[0]); cam.lookAt(...W.shot[1]); }   // тек әзірлеу кезіндегі скриншотқа (localhost)
   renderer.render(scene, cam);
 }

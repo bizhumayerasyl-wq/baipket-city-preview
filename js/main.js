@@ -2,7 +2,7 @@
 import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
-import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg, heroGesture, heroReady } from './world.js';
+import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg, heroGesture, heroReady, nearDoor, enterBuilding, exitBuilding, savePos } from './world.js';
 
 const $ = id => document.getElementById(id);
 const num = n => Math.round(n).toLocaleString('ru-RU'), fmt = n => num(n) + ' ₸';
@@ -179,7 +179,7 @@ function renderStats() {
 const EV = { price: 'бәсекелес бағаны 25% түсірді (3 күн). Бағаны қуалама — репутация мен жарнамаға сүйен.', ads: 'бәсекелес үлкен жарнама науқанын бастады (3 күн).', review: 'жаман пікір шықты, репутация түсті.' };
 function showAch(a) { toast(`${a[1]} Жетістік: <b>${a[2]}</b><br><span class="dim">${a[3]}</span>`, 5000); }
 function doDay() {
-  if (!Gm.active() || modalOn) return; g().t = 0; g().px = pos().x; g().pz = pos().z;
+  if (!Gm.active() || modalOn) return; g().t = 0; { const sp = savePos(); g().px = sp.x; g().pz = sp.z; }
   const o = Gm.endDay();
   if (o.day) { spawnClients(o.day.d, Math.min(o.day.l.clients, 12)); if (!o.result && !panelOpen()) toast(`Күн ${g().run.day}/${o.day.c.days}: лид ${o.day.l.leads}, клиент ${o.day.l.clients} · көрсеткіш ${num(o.day.val)}${o.day.c.goal.u}`, 3500); }
   if (o.own) spawnClients(o.own.d, Math.min(o.own.l.clients, 12));
@@ -280,7 +280,9 @@ function drawHud() {
   $('act').style.display = near ? 'block' : 'none';
   if (near) { const st = d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id);
     $('act').textContent = st === 'lock' ? `🔒 ${d.n}` : st === 'run' || st === 'own' ? `${d.e} Басқару${mobile ? '' : ' (E)'}` : st === 'sale' ? `${d.e} Сатып алу` : st === 'done' ? `${d.e} Қайта өту` : `${d.e} Иесімен сөйлесу${mobile ? '' : ' (E)'}`; }
-  $('car').style.display = nearCar() && !sheet ? 'block' : 'none'; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';
+  $('car').style.display = nearCar() && !sheet ? 'block' : 'none';
+  const dI = W.inside || nearDoor(); $('door').style.display = dI && !sheet && started ? 'block' : 'none';
+  if (dI) $('door').textContent = W.inside ? `🚪 Шығу${mobile ? '' : ' (Q)'}` : `🚪 Кіру: ${dI.name}${mobile ? '' : ' (Q)'}`; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';
   const city = started && !modalOn && !panelOpen(), obj = Gm.objective();
   $('next').style.display = city ? 'block' : 'none'; if ($('next').dataset.t !== obj) { $('next').dataset.t = obj; $('next').textContent = '▸ ' + obj; }
   const dot = { work: !Gm.active() && (CASES.some(c => Gm.caseState(c.id) === 'open') || Gm.fitState() === 'sale') };
@@ -295,7 +297,7 @@ function drawHud() {
 // ---------- Басқару ----------
 const car = () => { if (!modalOn && started && !toggleCar()) toast('Мұнда түсетін бос орын жоқ — сәл әрірек тұр.', 3000); };
 addEventListener('keydown', e => { if (modalOn || !started) return; W.keys[e.code] = 1; if (e.repeat) return;
-  if (e.code === 'KeyE') action(); if (e.code === 'KeyF') car(); if (e.code === 'Escape') closePanel(); });
+  if (e.code === 'KeyE') action(); if (e.code === 'KeyF') car(); if (e.code === 'KeyQ') door(); if (e.code === 'Escape') closePanel(); });
 addEventListener('keyup', e => W.keys[e.code] = 0);
 const stick = $('stick'), knob = $('knob');
 function joyMove(e) { const r = stick.getBoundingClientRect(); let x = (e.clientX - r.left - 60) / 45, y = (e.clientY - r.top - 60) / 45;
@@ -303,7 +305,8 @@ function joyMove(e) { const r = stick.getBoundingClientRect(); let x = (e.client
 stick.onpointerdown = e => { stick.setPointerCapture(e.pointerId); joyMove(e); };
 stick.onpointermove = e => { if (stick.hasPointerCapture(e.pointerId)) joyMove(e); };
 stick.onpointerup = stick.onpointercancel = () => { W.joy.x = W.joy.y = 0; knob.style.transform = ''; };
-$('act').onclick = action; $('car').onclick = car; $('x').onclick = closePanel;
+const door = () => { if (!started || modalOn) return; W.inside ? exitBuilding() : enterBuilding(nearDoor()); };
+$('act').onclick = action; $('car').onclick = car; $('door').onclick = door; $('x').onclick = closePanel;
 $('nav').onclick = e => { const b = e.target.closest('button'); if (!b || !started || (modalOn && !modalDis)) return; if (modalOn) closeModal(); goTab(b.dataset.t); };
 
 // ---------- Іске қосу ----------
@@ -316,4 +319,4 @@ startLoop(dt => {
   frame(dt, frozen);
   if (started && (hudT -= dt) <= 0) { hudT = .2; drawHud(); }
 });
-if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients, dbg, heroReady };   // тек әзірлеу кезінде
+if (['localhost', '127.0.0.1'].includes(location.hostname)) window.__game = { Gm, W, doDay, action, place, begin, pos, toggleCar, carPos, frame, stats, spawnClients, dbg, heroReady, nearDoor, enterBuilding, exitBuilding };   // тек әзірлеу кезінде

@@ -4,6 +4,7 @@ import { PITCH, DIST, DEFS, distAt, DAY } from './data.js';
 import { makeTextures, TX, batcher, roadMarkings, streetProps, buildCoffee } from './street.js';
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js';
 import { LANDMARKS, buildLandmark, updateLandmarks } from './landmarks.js';
+import { SHOPS } from './shops.js';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 export const W = { ang: Math.PI, speed: 0, inCar: false, joy: { x: 0, y: 0 }, keys: {} };
@@ -153,9 +154,10 @@ export function initWorld() {
     const d = DEFS.find(d => d.i === i && d.j === j);
     if (d) { const grp = new THREE.Group(); grp.position.set(x, 0, z); scene.add(grp);
       if (d.id === 'coffee') buildCoffee(grp, add);
+      else if (SHOPS[d.id]) buildLandmark({ ...SHOPS[d.id], id: d.id }, grp);                  // киім, салон, оқу, қойма, фитнес: өз сырты, «жалқау» іші
       else { add(new THREE.BoxGeometry(11, 4.4, 11), mat(d.col), 0, 2.2, 0, grp); add(new THREE.BoxGeometry(12.4, .6, 12.4), mat(0xffd400), 0, 4.7, 0, grp);
         add(new THREE.BoxGeometry(3, 2.6, .3), mat(0xcfe8ff), 0, 1.3, 5.5, grp); }
-      lots[d.id] = { grp, top: d.id === 'coffee' ? 7.7 : 5 }; colliders.push({ x, z, r: 6 }); continue; }
+      lots[d.id] = { grp, top: d.id === 'coffee' ? 7.7 : SHOPS[d.id] ? SHOPS[d.id].top : 5 }; colliders.push({ x, z, r: 6 }); continue; }
     const lm = LANDMARKS[`${i},${j}`];                                                       // басты ғимараттар (бас кеңсе, Event Center, Mentor Center)
     if (lm) { const grp = new THREE.Group(); grp.position.set(x, 0, z); scene.add(grp); buildLandmark(lm, grp); colliders.push({ x, z, r: 7 }); continue; }
     // Ғимарат: терезелі қасбет (4 бүйір), шатыр бөлек, бірінші қабатта дүкен белдеуі, үстінде карниз

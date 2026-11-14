@@ -7,8 +7,8 @@ import { bakeStatic } from './street.js';
 
 // ---------- Палитра және текстуралар ----------
 export const PAL = { brand: 0xffd400, ink: 0x15171b, metal: 0x2a2e35, brass: 0xc9a35a, stone: 0xe6dccb, concrete: 0xb9b6b0, glass: 0x9fb8c9 };
-const cv = (w, h, f) => { const c = document.createElement('canvas'); c.width = w; c.height = h; f(c.getContext('2d'), w, h); return c; };
-const tx = (c, rx = 1, ry = 1) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; return t; };
+export const cv = (w, h, f) => { const c = document.createElement('canvas'); c.width = w; c.height = h; f(c.getContext('2d'), w, h); return c; };
+export const tx = (c, rx = 1, ry = 1) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; return t; };
 let sd = 11; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
 
 // Шыны қасбет: аспанның шағылысы (жоғарыда ашық), жиектер, қабат плиталары, кейбір қабаттарда жылы жарық
@@ -19,15 +19,15 @@ const curtain = () => cv(384, 512, (x, w, h) => {
   for (let f = 0; f < 8; f++) for (let c = 0; c < 6; c++) if (r() < .2) { x.fillStyle = `rgba(255,${205 + r() * 25 | 0},${140 + r() * 40 | 0},${.5 + r() * .3})`; x.fillRect(c * 64 + 4, f * 64 + 10, 56, 46); }
   x.fillStyle = '#10151b'; for (let f = 0; f <= 8; f++) x.fillRect(0, f * 64 - 3, w, 6); for (let c = 0; c <= 6; c++) x.fillRect(c * 64 - 2, 0, 4, h);
 });
-const metalPanels = () => cv(256, 256, (x, w) => { x.fillStyle = '#2b2f36'; x.fillRect(0, 0, w, w);
+export const metalPanels = () => cv(256, 256, (x, w) => { x.fillStyle = '#2b2f36'; x.fillRect(0, 0, w, w);
   for (let i = 0; i < 4; i++) for (let j = 0; j < 8; j++) { const v = 40 + r() * 10 | 0; x.fillStyle = `rgb(${v},${v + 3},${v + 8})`; x.fillRect(i * 64 + 2, j * 32 + 2, 60, 28); } });
-const stone = (win) => cv(256, 256, (x, w) => { x.fillStyle = '#e4d9c6'; x.fillRect(0, 0, w, w);
+export const stone = (win) => cv(256, 256, (x, w) => { x.fillStyle = '#e4d9c6'; x.fillRect(0, 0, w, w);
   for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(120,95,60,${r() * .08})`; x.fillRect(r() * w, r() * w, 2 + r() * 6, 1 + r() * 2); }
   x.fillStyle = 'rgba(90,75,55,.25)'; for (let j = 0; j < 8; j++) x.fillRect(0, j * 32, w, 1.5);
   if (win) for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { const X = i * 128 + 30, Y = j * 128 + 22, g = x.createLinearGradient(0, Y, 0, Y + 86);
     g.addColorStop(0, '#7d93a6'); g.addColorStop(1, '#27323d'); x.fillStyle = '#1b1e23'; x.fillRect(X - 5, Y - 5, 78, 96); x.fillStyle = g; x.fillRect(X, Y, 68, 86);
     if (r() < .35) { x.fillStyle = 'rgba(255,214,150,.55)'; x.fillRect(X, Y + 30, 68, 56); } x.fillStyle = '#1b1e23'; x.fillRect(X + 32, Y, 4, 86); } });
-const floorStone = () => cv(256, 256, (x, w) => { const s = w / 2; for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { const v = 222 + r() * 16 | 0; x.fillStyle = `rgb(${v},${v - 4},${v - 12})`; x.fillRect(i * s, j * s, s, s); }
+export const floorStone = () => cv(256, 256, (x, w) => { const s = w / 2; for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) { const v = 222 + r() * 16 | 0; x.fillStyle = `rgb(${v},${v - 4},${v - 12})`; x.fillRect(i * s, j * s, s, s); }
   for (let i = 0; i < 260; i++) { x.strokeStyle = `rgba(150,130,100,${r() * .12})`; x.beginPath(); const a = r() * w, b = r() * w; x.moveTo(a, b); x.lineTo(a + r() * 40 - 20, b + r() * 40 - 20); x.stroke(); }
   x.strokeStyle = 'rgba(0,0,0,.18)'; x.strokeRect(0, 0, w, w); x.beginPath(); x.moveTo(s, 0); x.lineTo(s, w); x.moveTo(0, s); x.lineTo(w, s); x.stroke();
   const g = x.createRadialGradient(128, 128, 20, 128, 128, 180); g.addColorStop(0, 'rgba(255,230,180,.18)'); g.addColorStop(1, 'rgba(0,0,0,.1)'); x.fillStyle = g; x.fillRect(0, 0, w, w); });
@@ -46,23 +46,23 @@ const screenTex = (kind) => tx(cv(512, 256, (x, w, h) => {
   for (let i = 0; i < 10; i++) { const v = 40 + i * 14 + r() * 30; x.fillStyle = i % 3 ? '#3d7bd9' : '#ffd400'; x.fillRect(40 + i * 44, h - 30 - v, 26, v); }
   x.strokeStyle = '#7CFC9A'; x.lineWidth = 4; x.beginPath(); for (let i = 0; i < 10; i++) x.lineTo(53 + i * 44, h - 70 - i * 14 - r() * 10); x.stroke();
   x.fillStyle = '#e9e2d3'; x.font = 'bold 20px Arial, sans-serif'; x.fillText('LTV / CAC', 40, 28); }));
-const woodSlats = () => tx(cv(256, 256, (x, w) => { for (let i = 0; i < 16; i++) { const v = r() * 18 | 0; x.fillStyle = `rgb(${92 + v},${62 + v},${40 + v})`; x.fillRect(i * 16, 0, 13, w);
+export const woodSlats = () => tx(cv(256, 256, (x, w) => { for (let i = 0; i < 16; i++) { const v = r() * 18 | 0; x.fillStyle = `rgb(${92 + v},${62 + v},${40 + v})`; x.fillRect(i * 16, 0, 13, w);
   x.fillStyle = 'rgba(20,12,6,.9)'; x.fillRect(i * 16 + 13, 0, 3, w); } const g = x.createLinearGradient(0, 0, 0, w); g.addColorStop(0, 'rgba(255,220,160,.15)'); g.addColorStop(1, 'rgba(0,0,0,.25)'); x.fillStyle = g; x.fillRect(0, 0, w, w); }), 3, 1);
-const books = () => tx(cv(256, 64, (x, w, h) => { x.fillStyle = '#3a2618'; x.fillRect(0, 0, w, h); let p = 4;
+export const books = () => tx(cv(256, 64, (x, w, h) => { x.fillStyle = '#3a2618'; x.fillRect(0, 0, w, h); let p = 4;
   while (p < w - 8) { const bw = 6 + r() * 10; x.fillStyle = ['#7b2d26', '#1f4e5f', '#c9a35a', '#2f5d3a', '#e9e2d3', '#20242b'][r() * 6 | 0]; x.fillRect(p, 8 + r() * 10, bw - 1, h - 14); p += bw; } }), 2, 1);
 
 // ---------- Құрастыру көмекшілері ----------
 // B — «пісірілген» жарық: тон-маппингсіз, түсі дәл берілгендей (шам, экран, маңдайша, ішкі бөлме)
-const L = o => new THREE.MeshLambertMaterial(o), B = o => new THREE.MeshBasicMaterial({ toneMapped: false, ...o }), box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-function put(parent, geo, mat, x, y, z, ry = 0, cast = true) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = cast; m.receiveShadow = true; parent.add(m); return m; }
+export const L = o => new THREE.MeshLambertMaterial(o), B = o => new THREE.MeshBasicMaterial({ toneMapped: false, ...o }), box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+export function put(parent, geo, mat, x, y, z, ry = 0, cast = true) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.y = ry; m.castShadow = cast; m.receiveShadow = true; parent.add(m); return m; }
 const glassMat = () => new THREE.MeshPhongMaterial({ color: PAL.glass, transparent: true, opacity: .12, shininess: 120, specular: 0xffffff, depthWrite: false });
 // Витрина: әйнек және қою металл жақтау (тік әр 2 м, көлденең биіктікте)
-function storefront(g, w, h, z, metal, y0 = .24) {
+export function storefront(g, w, h, z, metal, y0 = .24) {
   const gl = put(g, new THREE.PlaneGeometry(w, h), glassMat(), 0, y0 + h / 2, z, 0, false);
   for (let x = -w / 2; x <= w / 2 + .01; x += w / Math.round(w / 2)) put(g, box(.12, h, .14), metal, x, y0 + h / 2, z + .02);
   put(g, box(w + .2, .16, .16), metal, 0, y0 + h, z + .02); put(g, box(w + .2, .3, .2), metal, 0, y0 + .15, z + .02); return gl;
 }
-const plant = (g, x, y, z, s = 1) => { put(g, new THREE.CylinderGeometry(.32 * s, .26 * s, .6 * s, 10), B({ color: 0x2a2d33 }), x, y + .3 * s, z); put(g, new THREE.IcosahedronGeometry(.6 * s, 1), B({ color: 0x3f7f45 }), x, y + 1.05 * s, z); };
+export const plant = (g, x, y, z, s = 1) => { put(g, new THREE.CylinderGeometry(.32 * s, .26 * s, .6 * s, 10), B({ color: 0x2a2d33 }), x, y + .3 * s, z); put(g, new THREE.IcosahedronGeometry(.6 * s, 1), B({ color: 0x3f7f45 }), x, y + 1.05 * s, z); };
 
 // ---------- 1. BAIPKET бас кеңсесі: шыны мұнара, екі қабатты лобби ----------
 function hqExterior(g, M) {
@@ -163,11 +163,9 @@ export const LANDMARKS = {
   '-3,-1': { id: 'event', name: 'BAIPKET EVENT CENTER', ext: eventExterior, int: eventInterior },
   '2,-1': { id: 'mentor', name: 'MENTOR CENTER', ext: mentorExterior, int: mentorInterior } };
 const live = [];
-export function buildLandmark(def, grp) {
-  const M = { metal: L({ color: PAL.metal }), concrete: L({ color: PAL.concrete }), concreteDark: L({ color: 0x8d8a85 }) };
-  def.ext(grp, M); bakeStatic(grp);                                                                         // сырты: бір материалға бір пішін
-  live.push({ def, grp, inner: null });
-}
+export const mats = () => ({ metal: L({ color: PAL.metal }), concrete: L({ color: PAL.concrete }), concreteDark: L({ color: 0x8d8a85 }) });
+// Кез келген ғимарат: сыртын салып біріктіреді, ішін «жалқау» тізімге қосады
+export function buildLandmark(def, grp) { def.ext(grp, mats()); bakeStatic(grp); live.push({ def, grp, inner: null }); }
 const IN = 45, OUT = 70;                                                                                     // жасалу және өшірілу қашықтығы (м)
 export function updateLandmarks(p) {
   for (const L of live) { const d = Math.hypot(p.x - L.grp.position.x, p.z - L.grp.position.z);

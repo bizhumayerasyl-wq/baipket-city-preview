@@ -81,3 +81,10 @@ blockquote { margin: 10px 0; padding: 8px 10px; background: #24262c; border-left
   #panel { max-height: 55vh; transition: max-height .2s; } #panel.full { max-height: calc(100% - 8px - var(--nh) - var(--st) - var(--sb)); }
 }
 #loading { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; background: #17181c; font-size: 16px; text-align: center; padding: 20px; }
+
+/* Келіссөз: сөйлем көпіршіктері, деректер, келісімшарт */
+.bub { padding: 8px 11px; border-radius: 12px; margin: 6px 0; line-height: 1.4; max-width: 92%; }
+.bub.owner { background: #24262c; border-left: 3px solid var(--y); }
+.bub.me { background: #1e3a2f; margin-left: auto; text-align: right; }
+.facts { background: #1d1e23; border-radius: 10px; padding: 8px 10px; margin-top: 10px; font-size: 13px; } .facts summary { cursor: pointer; color: var(--y); font-weight: 700; }
+.contract { background: #f5efe2; color: #222; border-radius: 10px; padding: 10px 12px; margin: 8px 0; } .contract td { border-top: 1px solid #d8cfbd !important; } .contract td:first-child { color: #6a5a3a !important; }

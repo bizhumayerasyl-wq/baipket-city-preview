@@ -2,7 +2,7 @@
 import { CASES, caseOf, caseV, nVars, defOf, DIST, LEVELS, XP, XP_DIAG, UPS, ACH, POS, GOAL, EVENTS } from './data.js';
 import { newBiz, simDay, rivalEvent, newRun, stepRun, buyUp, score, metric, mods } from './economy.js';
 
-const KEY = 'mq2', fresh = () => ({ v: 4, money: 50000, xp: 0, day: 1, t: 0, cases: {}, run: null, ach: {}, biz: {}, neg: 0, won: false, intro: false, fitCost: 0 });
+const KEY = 'mq2', fresh = () => ({ v: 4, money: 50000, xp: 0, day: 1, t: 0, cases: {}, run: null, ach: {}, biz: {}, neg: 0, won: false, intro: false, fitCost: 0, rep: 0, contracts: [] });   // rep — ойыншының беделі, contracts — портфель
 export let g = fresh();
 export let saveError = false;
 export const hasSave = () => { try { const s = JSON.parse(localStorage.getItem(KEY)); return !!(s && s.v === 4 && s.intro); } catch (e) { return false; } };
@@ -27,7 +27,7 @@ export const caseState = id => g.run && g.run.id === id ? 'run' : caseOf(id).lvl
 export const fitCost = () => g.fitCost || defOf('fit').cost;
 export const fitState = () => g.biz.fit ? 'own' : level() < 4 ? 'lock' : 'sale';
 export const active = () => !!(g.run || g.biz.fit);
-export const upCost = (k, isCase) => UPS.find(u => u[0] === k)[3] * (isCase ? runCase().budget : defOf('fit').cost);
+export const upCost = (k, isCase) => UPS.find(u => u[0] === k)[3] * (isCase ? (g.run.budget0 || runCase().budget) : defOf('fit').cost);
 
 export function objective() {
   if (g.run) return runCase().goal.t;
@@ -64,10 +64,21 @@ export function chooseEvent(i) {
   run.evLog.push([r.good, `${e.e} ${e.title} → «${o.t}». ${r.why}`]); run.pend = null; save();
   return { ...r, cost, e, o };
 }
+// ---------- Келіссөз нәтижесі ----------
+// Келісім: келісімшарт портфельге түседі, кейс келісілген бюджет пен гонорармен басталады
+export function signContract(N) {
+  const k = N.contract; if (!k || g.run) return null; const id = 'k' + (g.contracts.length + 1), r = rec(k.caseId);
+  const contract = { ...k, id, day: g.day, status: 'active' }; delete contract.pick; contract.pickNames = null; g.contracts.push(contract);
+  r.trust = Math.round(N.trust); r.cool = 0; r.rejected = false;
+  startCase(k.caseId, k.pick, k.diag, { v: k.v }); g.run.cash = k.budget; g.run.budget0 = k.budget; g.run.feeMul = k.feeMul; g.run.contract = id; save(); return contract;
+}
+// Бас тарту: иесі сенім деңгейін есте сақтайды, келесі ойын күніне дейін қайта сөйлеспейді
+export function rejectNegotiation(N) { const r = rec(N.caseId); r.trust = Math.round(N.trust); r.cool = g.day + 1; r.rejected = true; save(); }
+export const canNegotiate = id => { const r = rec(id); return !r.cool || g.day >= r.cool; };
 export function buyCaseUp(k) { const ok = buyUp(g.run, k, upCost(k, true)); if (ok) save(); return ok; }
 
 function finishCase() {
-  const run = g.run, v = run.v || 0, c = caseV(run.id, v), d = defOf(run.id), s = score(run, c, d), r = vrec(rec(c.id)), L0 = level(), ach = [], why = [], vs = r.vs[v] || 0;
+  const run = g.run, v = run.v || 0, c = caseV(run.id, v), B0 = run.budget0 || caseV(run.id, v).budget, d = defOf(run.id), s = score(run, c, d), r = vrec(rec(c.id)), L0 = level(), ach = [], why = [], vs = r.vs[v] || 0;
   const diagOk = run.diag === c.diagOk, x = mods(c, run.pick), sg = c.segs[run.pick.seg], of = c.offs[run.pick.off], t = run.tot;
   why.push([diagOk, `Диагноз: ${diagOk ? 'мәселені дұрыс таптың' : 'қате. Нақты мәселе — «' + c.diag[c.diagOk] + '»'}.`]);
   why.push([run.pick.seg === c.segOk, `Сегмент: ${sg.why}`]);
@@ -75,7 +86,7 @@ function finishCase() {
     : x.pm === 1 ? `Позициялау: «${POS[run.pick.pos]}» қабылданды, бірақ бұл аудиторияға «${POS[sg.pos]}» күштірек әсер етер еді.`
       : `Позициялау: бұл аудиторияға «${POS[run.pick.pos]}» маңызды емес, ол «${POS[sg.pos]}» іздейді (−25%).`]);
   why.push([run.pick.off === c.offOk, `Оффер: ${of.why}`]);
-  why.push([!run.waste && !run.broke, `Бюджет: ${Math.round((c.budget - run.cash) / c.budget * 100)}% жұмсалды.` +
+  why.push([!run.waste && !run.broke, `Бюджет: ${Math.round((B0 - run.cash) / B0 * 100)}% жұмсалды.` +
     (run.waste ? ` ${run.waste} күн блогерге минимумнан аз ақша кетіп, нәтиже бермеді.` : '') + (run.broke ? ` ${run.broke} күн бюджет жетпей, жарнама тоқтады.` : '')]);
   for (const [ok, t] of run.evLog || []) why.push([ok, t]);
   if (c.must && !s.must) why.push([false, `Шарт орындалмады: ${c.must.t}.`]);
@@ -87,7 +98,7 @@ function finishCase() {
 
   // Сыйақы әр нұсқа үшін бөлек: тек осы нұсқадағы жұлдыз өскенде
   let xp = Math.max(0, XP[s.stars] - XP[vs]); if (diagOk && !r.vd[v]) { xp += XP_DIAG; r.vd[v] = true; r.diag = true; }
-  const FM = [0, 1, 1.5, 2], fee = s.stars > vs ? Math.round(c.fee * (FM[s.stars] - FM[vs]) * LEVELS[L0].fee) : 0;
+  const FM = [0, 1, 1.5, 2], fee = s.stars > vs ? Math.round(c.fee * (FM[s.stars] - FM[vs]) * LEVELS[L0].fee * (run.feeMul || 1)) : 0;   // келісімшарттағы гонорар коэффициенті
   if (s.ok && r.failed) grant('grit', ach);
   if (!s.ok && !r.stars) r.failed = true;
   r.vs[v] = Math.max(vs, s.stars); r.stars = Math.max(r.stars, s.stars); r.paid += fee;
@@ -95,12 +106,17 @@ function finishCase() {
   let next = null; if (s.ok && nVars(c) > 1) { const all = [...Array(nVars(c)).keys()].filter(k => k !== v), fresh = all.filter(k => !r.vs[k]);
     r.v = next = (fresh.length ? fresh : all)[Math.floor(Math.random() * (fresh.length || all.length))]; } g.xp += xp; g.money += fee;
   if (s.ok) { grant('first', ach); if (s.stars === 3) grant('star3', ach);
-    if (run.cash >= c.budget * .25) grant('thrift', ach); if (UPS.every(u => run.b.up[u[0]])) grant('funnel', ach); }
+    if (run.cash >= B0 * .25) grant('thrift', ach); if (UPS.every(u => run.b.up[u[0]])) grant('funnel', ach); }
   if (CASES.filter(k => rec(k.id).diag).length >= 3) grant('diag3', ach);
   if (CASES.every(k => rec(k.id).stars)) grant('all', ach);
   if (CASES.every(k => rec(k.id).stars === 3)) grant('perfect', ach);
   g.run = null;
-  return { c, s, xp, fee, ach, why, next, lvlUp: level() > L0 ? LEVELS[level()] : null, left: run.cash };
+  // Келісімшарт: мәртебесі, бедел, кепілдік берілсе және мақсат орындалмаса — айыппұл
+  let contract = null, penalty = 0; if (run.contract) { contract = g.contracts.find(k => k.id === run.contract);
+    if (contract) { contract.status = s.ok ? 'done' : 'failed'; contract.stars = s.stars; contract.paid = fee; contract.endDay = g.day;
+      if (s.ok) g.rep = (g.rep || 0) + s.stars; else { g.rep = (g.rep || 0) - (contract.guarantee ? 3 : 1); if (contract.guarantee) { penalty = Math.round(contract.fee * .3); g.money -= penalty; } }
+      if (contract.guarantee) why.push([s.ok, s.ok ? 'Кепілдік орындалды — иесінің сенімі артты.' : `Кепілдік орындалмады: келісімшарт бойынша ${penalty.toLocaleString('ru-RU')} ₸ қайтардың.`]); } }
+  return { c, s, xp, fee, ach, why, next, contract, penalty, lvlUp: level() > L0 ? LEVELS[level()] : null, left: run.cash };
 }
 export function quitCase() { if (!g.run) return; const r = rec(g.run.id); if (!r.stars) r.failed = true; g.run = null; save(); }
 

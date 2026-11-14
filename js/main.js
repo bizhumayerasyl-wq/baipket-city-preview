@@ -2,6 +2,8 @@
 import { DAY, DIST, DEFS, distAt, defOf, CASES, caseOf, caseV, nVars, CH, POS, UPS, LEVELS, ACH, GLOS, GOAL } from './data.js';
 import { metric } from './economy.js';
 import * as Gm from './game.js';
+import * as NG_ from './negotiation.js';
+import { coffeeOwner, ownerReact } from './coffee.js';
 import { W, mobile, initWorld, setLabel, pos, carPos, nearCar, nearLot, toggleCar, spawnClients, frame, startLoop, place, stats, dbg, heroGesture, heroReady, nearDoor, enterBuilding, exitBuilding, savePos } from './world.js';
 
 const $ = id => document.getElementById(id);
@@ -78,8 +80,71 @@ function action() {
   if (st === 'lock') return toast(`${c.name} әзірге саған сенбейді. Бұл тапсырыс «${LEVELS[c.lvl].n}» деңгейінде ашылады.`);
   if (st === 'run') return openPanel('case');
   if (g().run) return toast(`Алдымен ағымдағы кейсті аяқта: ${caseOf(g().run.id).name}.`);
+  if (NEGOTIABLE(c.id)) return startTalk(c.id);                                     // кофейня: тікелей иесімен келіссөз
   heroGesture('Interact'); wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz();
 }
+// ---------- Иемен келіссөз (қазір кофейняда): сұрақтар → диагноз → ұсыныс → қарсылық → шарттар → келісімшарт ----------
+let NG = null, ngSub = null;
+const NEGOTIABLE = id => id === 'coffee';
+function startTalk(id) {
+  if (!Gm.canNegotiate(id)) return toast(`${caseOf(id).owner} бүгін сөйлескісі келмейді. Ертең қайта кел.`);
+  NG = NG_.startNegotiation(id, Gm.curVar(id), g(), Gm.rec(id), Gm.level()); ngSub = null;
+  const o = W.inside && coffeeOwner(); if (o) W.ang = Math.atan2(o.x - pos().x, o.z - pos().z);   // ойыншы иеге бұрылады
+  heroGesture('Wave'); renderTalk();
+}
+function renderTalk() {
+  const N = NG, c = N.c, tr = Math.round(N.trust), tcol = tr >= 60 ? 'good' : tr < 35 ? 'bad' : '';
+  const last = N.log.slice(-3).map(([w, t]) => `<div class="bub ${w}">${t}</div>`).join('');
+  const facts = N.asked.length ? `<details class="facts"><summary>📊 Деректер (${N.asked.length})</summary>${N.asked.map(id => `<div>• ${NG_.QUESTIONS.find(q => q.id === id).a(N.facts)}</div>`).join('')}</details>` : '';
+  const head = `<div class="dim">${c.name} · келіссөз</div><h2>💬 ${N.owner}</h2>
+    <div class="kv"><span>Сенім: <b class="${tcol}">${tr}</b>/100</span><span class="dim">Уақыты: ${'●'.repeat(N.patience)}${'○'.repeat(Math.max(0, 7 - N.patience))}</span></div>
+    <div class="bar"><i style="width:${tr}%"></i></div>`;
+  const opt = (a, t, sub, dis) => `<button class="opt"${dis ? ' disabled' : ''} data-a="${a}"><b>${t}</b>${sub ? `<br><span>${sub}</span>` : ''}</button>`;
+  let body = '', H = { leave: () => { closeModal(); NG = null; } };
+  if (N.stage === 'intro' && !ngSub) {
+    body = (N.log.length ? last : `<p>${c.desc} ${c.aud}</p><div class="bub owner">${c.say}</div>`) +
+      opt('ask', '❓ Сұрақ қою', 'Әр сұрақ иесінің уақытын алады', N.patience <= 0 || !NG_.available(N).length) + opt('diag', '🩺 Мәселені атау', 'Деректерге сүйенсең, ие саған көбірек сенеді') +
+      '<button class="lnk" data-a="leave">Кейін сөйлесемін</button>';
+    H.ask = () => { ngSub = 'ask'; renderTalk(); }; H.diag = () => { ngSub = 'diag'; renderTalk(); };
+  } else if (ngSub === 'ask') {
+    body = last + NG_.available(N).map(q => opt('q', q.q).replace('data-a="q"', `data-a="q" data-k="${q.id}"`)).join('') + '<button class="b2" data-a="back">← Артқа</button>';
+    H.q = ({ k }) => { NG_.ask(N, k); if (N.patience <= 0 || !NG_.available(N).length) ngSub = null; renderTalk(); }; H.back = () => { ngSub = null; renderTalk(); };
+  } else if (ngSub === 'diag') {
+    body = last + '<p class="dim">Басты мәселе қайсы?</p>' + c.diag.map((t, i) => opt('d', t).replace('data-a="d"', `data-a="d" data-i="${i}"`)).join('') + '<button class="b2" data-a="back">← Артқа</button>';
+    H.d = ({ i }) => { NG_.diagnose(N, +i); ngSub = N.stage === 'propose' ? 'seg' : null; renderTalk(); }; H.back = () => { ngSub = null; renderTalk(); };
+  } else if (N.stage === 'propose') {
+    const step = ngSub === 'pos' ? 'pos' : ngSub === 'off' ? 'off' : 'seg', P = N.pick = N.pick || {};
+    body = last + (step === 'seg' ? '<p class="dim">Ұсыныс, 1/3: кімге сатамыз?</p>' + c.segs.map((s, i) => opt('p', s.n, s.d).replace('data-a="p"', `data-a="p" data-i="${i}"`)).join('')
+      : step === 'pos' ? '<p class="dim">Ұсыныс, 2/3: клиент бізді немен есте сақтайды?</p>' + POS.map((t, i) => opt('p', t).replace('data-a="p"', `data-a="p" data-i="${i}"`)).join('')
+      : '<p class="dim">Ұсыныс, 3/3: оффер</p>' + c.offs.map((o, i) => opt('p', o.n, o.d).replace('data-a="p"', `data-a="p" data-i="${i}"`)).join(''));
+    H.p = ({ i }) => { P[step] = +i; if (step === 'seg') ngSub = 'pos'; else if (step === 'pos') ngSub = 'off'; else { NG_.propose(N, { seg: P.seg, pos: P.pos, off: P.off }); ngSub = null; } renderTalk(); };
+  } else if (N.stage === 'objection') {
+    const o = NG_.currentObjection(N), can = NG_.canUseData(N, o.k);
+    body = last + opt('r', '📊 Деректерге сүйену', can ? 'Сұрақтардан білген сандарыңмен дәлелде' : 'Бұл үшін алдымен тиісті деректі сұрау керек еді', !can).replace('data-a="r"', 'data-a="r" data-k="data"') +
+      opt('r', '🤝 Нәтижеге кепілдік беру', 'Сенім өседі. Бірақ мақсат орындалмаса — гонорардың 30%-ын қайтарасың').replace('data-a="r"', 'data-a="r" data-k="promise"') +
+      opt('r', '🔄 Ұсынысты өзгерту', 'Иесінің уақыты азаяды', N.patience <= 0).replace('data-a="r"', 'data-a="r" data-k="change"');
+    H.r = ({ k }) => { NG_.answer(N, k); ngSub = N.stage === 'propose' ? 'seg' : null; if (N.stage === 'propose') N.pick = {}; renderTalk(); };
+  } else if (N.stage === 'terms') {
+    const T = N.terms, L = LEVELS[Gm.level()], fees = NG_.FEE_OPTS.map(m => Math.round(c.fee * L.fee * m)), buds = NG_.BUDGET_OPTS.map(m => Math.round(c.budget * m));
+    const seg = (a, list, cur, opts) => `<div class="seg">${list.map((v, i) => `<button class="${opts[i] === cur ? 'on' : ''}" data-a="${a}" data-i="${i}">${fmt(v)}</button>`).join('')}</div>`;
+    body = last + `<b>Сенің гонорарың</b>${seg('fee', fees, T.fee, NG_.FEE_OPTS)}<b>Науқан бюджеті (иесінің ақшасы)</b>${seg('bud', buds, T.budget, NG_.BUDGET_OPTS)}
+      <p class="dim">Мерзімі: ${c.days} күн · Мақсат: ${c.goal.t}${N.guarantee ? '<br>⚠️ Кепілдік берілді: мақсат орындалмаса, гонорардың 30%-ы қайтарылады.' : ''}<br>Көбірек сұрасаң, иесінің сенімі көбірек керек.</p>
+      <button class="b1" data-a="offer">Шартты ұсыну</button>`;
+    H.fee = ({ i }) => { T.fee = NG_.FEE_OPTS[+i]; renderTalk(); }; H.bud = ({ i }) => { T.budget = NG_.BUDGET_OPTS[+i]; renderTalk(); };
+    H.offer = () => { const r = NG_.offerTerms(N, { ...T }, Gm.level()); if (r === 'agreed') ownerReact('happy'); renderTalk(); };
+  } else if (N.status === 'agreed') {
+    const k = N.contract;
+    body = last + `<div class="contract"><b>📄 КЕЛІСІМШАРТ</b><table><tr><td>Тапсырыс беруші</td><td>${N.owner}, ${c.name}</td></tr><tr><td>Мақсат</td><td>${c.goal.t}</td></tr>
+      <tr><td>Мерзімі</td><td>${k.days} күн</td></tr><tr><td>Бюджет</td><td>${fmt(k.budget)}</td></tr><tr><td>Гонорар</td><td>${fmt(k.fee)} (3★ болса — ×2)</td></tr>
+      ${k.guarantee ? '<tr><td>Кепілдік</td><td>Орындалмаса — 30% қайтарылады</td></tr>' : ''}</table></div><button class="b1" data-a="sign">✍️ Қол қою және бастау</button>`;
+    H.sign = () => { if (!Gm.signContract(N)) return; NG = null; closeModal(); refreshLots(); paused = true; openPanel('case'); toast('Келісімшартқа қол қойылды. Бюджетті бөліп, ▶ бас.', 6000); };
+  } else {
+    body = last + '<p class="dim">Келісім болмады. Ие сенің сенім деңгейіңді есте сақтайды — ертең қайта келуге болады.</p><button class="b1" data-a="end">Түсіндім</button>';
+    H.end = () => { Gm.rejectNegotiation(N); NG = null; closeModal(); };
+  }
+  modal(head + body + facts, H);
+}
+
 
 // ---------- Кейс шебері: бриф → диагноз → сегмент → позиция → оффер → іске қосу ----------
 function renderWiz() {
@@ -229,7 +294,7 @@ function showResult(r) {
     ${r.lvlUp ? `<p class="lvl">⬆ Жаңа деңгей: <b>${r.lvlUp.n}</b><br>${r.lvlUp.open}</p>` : ''}
     ${r.next != null ? `<p class="note">📞 ${c.owner} риза. Келесі жолы ол <b>басқа мәселемен</b> шақырады — бизнеске қайта барсаң, жаңа тапсырыс күтеді.</p>` : ''}
     <div class="row"><button class="b2" data-a="again">Қайта өту</button><button class="b1" data-a="ok">Жабу</button></div>`,
-  { ok: closeModal, again: () => { wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz(); } });
+  { ok: closeModal, again: () => { if (NEGOTIABLE(c.id)) { closeModal(); return startTalk(c.id); } wiz = { c: caseV(c.id, Gm.curVar(c.id)), step: 0, pick: {} }; renderWiz(); } });
 }
 
 // ---------- Профиль мен глоссарий ----------
@@ -253,6 +318,7 @@ function showWork() {
   const lbl = (st, c) => st === 'open' ? (Gm.rec(c.id).tries ? 'қайта өтуге болады' : '<span class="good">Жаңа тапсырыс</span>') : st === 'run' ? 'жүріп жатыр' : '';
   modal(`<h2>💼 Жұмыс</h2><p class="lvl">▸ ${Gm.objective()}</p><b>Тапсырыстар</b>` +
     CASES.map(c => { const st = Gm.caseState(c.id); return `<div>${defOf(c.id).e} ${c.name} — ${st === 'lock' ? `<span class="dim">🔒 ${LEVELS[c.lvl].n}</span>` : st === 'done' ? stars(Gm.rec(c.id).stars) : lbl(st, c)}</div>`; }).join('') +
+    (g().contracts.length ? `<b>Портфель · бедел ${g().rep || 0}</b>` + g().contracts.slice().reverse().map(k => `<div>📄 ${caseOf(k.caseId).name} — ${k.status === 'active' ? '<span class="good">жүріп жатыр</span>' : k.status === 'done' ? stars(k.stars) + ` · ${fmt(k.paid || 0)}` : '<span class="bad">орындалмады</span>'}<span class="dim"> · гонорар ${fmt(k.fee)}${k.guarantee ? ' · кепілдік' : ''}</span></div>`).join('') : '') +
     `<p class="dim">Тапсырыс алу үшін қаладағы бизнеске бар (картадағы сары белгі).</p><button class="b1" data-a="ok">Қалаға оралу</button>`, { ok: closeModal }, { dis: true, tab: 'work' });
 }
 function showStats() {
@@ -260,7 +326,7 @@ function showStats() {
     st = CASES.reduce((a, c) => a + (Gm.rec(c.id).stars || 0), 0), ach = ACH.filter(a => s.ach[a[0]]).length,
     tile = (n, v, cap) => `<div class="tile"><small>${n}</small><b>${v}</b><span>${cap}</span></div>`;
   modal(`<h2>📈 Статистика</h2><div class="tiles">${tile('Ақша', fmt(s.money), 'сенің қалтаңда') + tile('Тәжірибе', s.xp + ' XP', nx ? `келесі деңгейге ${nx.xp - s.xp} XP` : 'ең жоғары деңгей') +
-    tile('Кейстер', `${done}/${CASES.length}`, 'аяқталған') + tile('Жұлдыз', `${st}/${CASES.length * 3}`, 'барлық кейстерде')}<div class="tile wide"><small>Жетістіктер</small><b>${ach}/${ACH.length}</b><span>толығы Профильде</span></div></div>` +
+    tile('Кейстер', `${done}/${CASES.length}`, 'аяқталған') + tile('Жұлдыз', `${st}/${CASES.length * 3}`, 'барлық кейстерде') + tile('Бедел', String(s.rep || 0), 'келісімшарттардан') + tile('Келісімшарт', String((s.contracts || []).length), 'портфельде')}<div class="tile wide"><small>Жетістіктер</small><b>${ach}/${ACH.length}</b><span>толығы Профильде</span></div></div>` +
     (Gm.active() ? '<button class="b2" data-a="run" style="display:block;width:100%;margin-top:10px">📊 Науқанның күндік көрсеткіштері</button>' : '<p class="dim">Науқан көрсеткіштері (лид, конверсия, CPL, ROI) кейс жүріп жатқанда осында шығады.</p>') +
     '<button class="b1" data-a="ok">Жабу</button>', { ok: closeModal, run: () => { closeModal(); panelSec = 'res'; openPanel(); } }, { dis: true, tab: 'stat' });
 }
@@ -276,10 +342,12 @@ function drawHud() {
   const pn = narrow.matches && panelOpen(), sheet = modalOn || (pn && !PC.contains('min'));   // телефонда парақ ашық — джойстик пен батырмалар жасырын
   const ph = pn && !sheet ? $('panel').offsetHeight + 'px' : '0px'; if (document.body.style.getPropertyValue('--ph') !== ph) document.body.style.setProperty('--ph', ph);   // жиылған панельдің үстінде
   if ($('stick').hidden !== sheet) { $('stick').hidden = sheet; if (sheet) { W.joy.x = W.joy.y = 0; knob.style.transform = ''; } }
-  const d = nearLot(), near = d && !W.inCar && !sheet && started;
+  // Кофейняның ішінде әрекет батырмасы тек иесінің жанында (2,6 м) шығады
+  const own = W.inside && W.inside.id === 'coffee' ? coffeeOwner() : null, nearOwner = own && Math.hypot(own.x - pos().x, own.z - pos().z) < 2.6;
+  const d = nearLot(), near = d && !W.inCar && !sheet && started && (!W.inside || W.inside.id !== 'coffee' || nearOwner || Gm.caseState('coffee') === 'run');
   $('act').style.display = near ? 'block' : 'none';
   if (near) { const st = d.id === 'fit' ? Gm.fitState() : Gm.caseState(d.id);
-    $('act').textContent = st === 'lock' ? `🔒 ${d.n}` : st === 'run' || st === 'own' ? `${d.e} Басқару${mobile ? '' : ' (E)'}` : st === 'sale' ? `${d.e} Сатып алу` : st === 'done' ? `${d.e} Қайта өту` : `${d.e} Иесімен сөйлесу${mobile ? '' : ' (E)'}`; }
+    $('act').textContent = nearOwner && st !== 'run' && st !== 'lock' ? `💬 ${caseOf(d.id).owner}мен сөйлесу` : st === 'lock' ? `🔒 ${d.n}` : st === 'run' || st === 'own' ? `${d.e} Басқару${mobile ? '' : ' (E)'}` : st === 'sale' ? `${d.e} Сатып алу` : st === 'done' ? `${d.e} Қайта өту` : `${d.e} Иесімен сөйлесу${mobile ? '' : ' (E)'}`; }
   $('car').style.display = nearCar() && !sheet ? 'block' : 'none';
   const dI = W.inside || nearDoor(); $('door').style.display = dI && !sheet && started ? 'block' : 'none';
   if (dI) $('door').textContent = W.inside ? `🚪 Шығу${mobile ? '' : ' (Q)'}` : `🚪 Кіру: ${dI.name}${mobile ? '' : ' (Q)'}`; $('car').textContent = W.inCar ? '🚶 Түсу' : '🚗 Отыру';

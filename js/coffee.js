@@ -151,7 +151,8 @@ function interior(g) {
 // ---------- Тірі бөлік: NPC-лер, бу, дыбыс ----------
 let life = null;
 const BAR_STOPS = [[-2.9, -3.3, 0, 4.5], [.4, -3.3, 0, 3], [1.75, -3.2, 0, 3.5], [-3.9, -3.3, 0, 3]];   // [x, z, бағыт, кідіріс (с)] — бариста
-const CUST = [[3.45, 4.6], [2.2, .3], [.4, -1.15]];                                                       // келуші: есік → зал → тапсырыс
+const CUST = [[3.45, 4.6], [2.2, .3], [.4, -1.15]];
+const OWNER = [1.5, 1.6];                                                                                   // иесінің орны (кеңес үстелінің орындығы)                                                       // келуші: есік → зал → тапсырыс
 function addLife(g) {
   const L = life = { g: new THREE.Group(), ppl: [], steam: [], token: {}, t: 0 }; g.add(L.g);
   // Бу: машинаның бу түтігінің үстінде көтеріліп, сейіліп кететін жұмсақ дақтар
@@ -163,6 +164,8 @@ function addLife(g) {
   spawn({ suit: 0x1f4a3a, tie: 0xc9a35a, height: 2.25 }, ch => { Object.assign(ch, { kind: 'barista', stop: 0, wait: 2, pos: new THREE.Vector3(-2.9, .26, -3.3) }); ch.root.position.copy(ch.pos); play(ch, 'Interact'); });
   // Келуші 1: есіктен кіреді, кассаға келіп тапсырыс береді, биік үстелдің жанында кофе ішеді, шығып кетеді, қайта оралады
   spawn({ suit: 0x8a2f2f, height: 2.3 }, ch => { Object.assign(ch, { kind: 'cust', step: 0, wait: 1, pos: new THREE.Vector3(3.45, .26, 4.6) }); ch.root.position.copy(ch.pos); ch.root.visible = false; play(ch, 'Idle'); });
+  // Иесі (Айгүл): кеңес үстелінде отырады; ойыншы жақындағанда онымен келіссөз басталады
+  spawn({ model: 'woman', suit: 0x1f4a3a, height: 2.1 }, ch => { Object.assign(ch, { kind: 'owner', pos: new THREE.Vector3(OWNER[0], .26, OWNER[1]) }); ch.root.position.copy(ch.pos); ch.root.rotation.y = -Math.PI / 2; play(ch, 'Sitting'); });
   // Келуші 2: терезе алдындағы барда тұрып кофе ішеді, анда-санда кесесін көтереді
   spawn({ suit: 0x6b6f76, shirt: 0xd9c9a8, height: 2.2 }, ch => { Object.assign(ch, { kind: 'window', wait: 5, pos: new THREE.Vector3(-1.95, .26, 3.85) }); ch.root.position.copy(ch.pos); ch.root.rotation.y = 0; play(ch, 'Idle'); });
 }
@@ -188,6 +191,7 @@ function tick(dt) {
         () => { play(ch, 'Interact'); ch.wait = 2.2; return true; }, () => { play(ch, 'Idle'); ch.wait = 5; return true; },
         () => walkTo(ch, CUST[0][0], CUST[0][1], dt), () => { ch.root.visible = false; play(ch, 'Idle'); ch.wait = 7; return true; }];
       if (steps[ch.step]()) ch.step = (ch.step + 1) % steps.length; }
+    else if (ch.kind === 'owner') { if (ch.react > 0 && (ch.react -= dt) <= 0) play(ch, 'Sitting'); }
     else if (ch.kind === 'window') { if ((ch.wait -= dt) <= 0) { const sip = ch.cur !== ch.act.Interact; play(ch, sip ? 'Interact' : 'Idle'); ch.wait = sip ? 2.4 : 6 + Math.random() * 4; } }
   }
   if (snd) snd.tick(dt);
@@ -215,4 +219,7 @@ function stopSound() { if (snd) { snd.on = false; snd.master.gain.setTargetAtTim
 
 export const coffeeDef = { id: 'coffee', int: interior, live: addLife, tick, enter: startSound, leave: stopSound,
   dispose() { stopSound(); if (!life) return; life.token = null; for (const ch of life.ppl) disposeCharacter(ch); if (life.steam[0]) life.steam[0].material.map.dispose(); for (const s of life.steam) s.material.dispose(); life = null; } };
+// Иесінің әлемдегі орны (ойыншы жақындағанын білу үшін) және оның реакциясы
+export const coffeeOwner = () => { const o = life && life.ppl.find(p => p.kind === 'owner'); if (!o) return null; const w = new THREE.Vector3(); o.root.getWorldPosition(w); return { x: w.x, z: w.z }; };
+export function ownerReact(kind) { const o = life && life.ppl.find(p => p.kind === 'owner'); if (!o) return; if (kind === 'happy') { play(o, 'Clapping'); o.react = 2.6; } else play(o, 'Sitting'); }
 export const coffeeStats = () => life ? { npcs: life.ppl.length, steam: life.steam.length } : null;
